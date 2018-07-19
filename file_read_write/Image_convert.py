@@ -1,4 +1,5 @@
 """
+utf-8
 This program distribute every images in each categories to train data and validation data.
 
 you have 6 category of images in below directory
@@ -35,6 +36,10 @@ which does exactly same thing. :D
 from os import walk
 from PIL import Image
 import os, shutil, random, sys, struct
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--num', type=int, dest='num', default=0)
+args, unparsed = parser.parse_known_args() 
 
 def img_convert(fname, src_dir, dest_dir):
     size = 256, 256
@@ -44,18 +49,19 @@ def img_convert(fname, src_dir, dest_dir):
     # Which means you don't need to check the file type.  
     im.thumbnail(size, Image.ANTIALIAS)        
     im.convert('RGB').save(dest_dir + fname, 'JPEG')
+    os.remove(src_dir + fname)
     return im.size, im.format
 
-base_dir_o = '~/../shared/danbooru2017/512px/'
-dest_dir_o = '~/../shared/danbuuru2017/256px/'
+base_dir_o = '/home/siit/navi/data/danbooru2017/512px/'
+dest_dir_o = '/home/siit/navi/data/danbooru2017/256px/'
 
 # I'm sure this way is pretty stupid, but after you do this once, it would run fast 
 # because system store this list on the cache.
 # randomly shffle the files and divide 
 
 for i in range(500):
-    base_dir = base_dir_o + '{0:04d}'.format(i)
-    dest_dir = dest_dir_o + '{0:04d}'.format(i)
+    base_dir = base_dir_o + '{0:04d}/'.format(i+args.num)
+    dest_dir = dest_dir_o + '{0:04d}/'.format(i+args.num)
 
     if (not os.path.exists(dest_dir)):
         os.mkdir(dest_dir)
