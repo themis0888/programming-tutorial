@@ -49,11 +49,11 @@ def img_convert(fname, src_dir, dest_dir):
     # Which means you don't need to check the file type.  
     im.thumbnail(size, Image.ANTIALIAS)        
     im.convert('RGB').save(dest_dir + fname, 'JPEG')
-    os.remove(src_dir + fname)
+    # os.remove(src_dir + fname)
     return im.size, im.format
 
-base_dir_o = '/home/siit/navi/data/danbooru2017/512px/'
-dest_dir_o = '/home/siit/navi/data/danbooru2017/256px/'
+base_dir_o = '/shared/danbooru2017/512px/'
+dest_dir_o = '/shared/danbooru2017/256px/'
 
 # I'm sure this way is pretty stupid, but after you do this once, it would run fast 
 # because system store this list on the cache.
