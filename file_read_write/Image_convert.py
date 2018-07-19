@@ -57,11 +57,11 @@ for i in range(500):
     base_dir = base_dir_o + '{0:04d}'.format(i)
     dest_dir = dest_dir_o + '{0:04d}'.format(i)
 
-if (not os.path.exists(dest_dir)):
-    os.mkdir(dest_dir)
+    if (not os.path.exists(dest_dir)):
+        os.mkdir(dest_dir)
 
-print('From {}'.format(base_dir))
-print('To {}'.format(dest_dir))
+    print('From {}'.format(base_dir))
+    print('To {}'.format(dest_dir))
 
     dir_lst = os.listdir(base_dir)
     random.shuffle(dir_lst)
