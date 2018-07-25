@@ -1,48 +1,77 @@
-import collections, itertools
-import matplotlib as mpl
-mpl.use('Agg')
-import matplotlib.pyplot as plt
-import numpy as np
-import os 
-import operator
+import json
+import urllib.request
+import os
+import tqdm
 
-metadata_path = ''
-tag_dict = {}
-for i in range(6):
-	tag_dict.update(dict(np.load(os.path.join(metadata_path, 'metadata_{}.npy'.format(i))).item()))
+class ImageDownLoader(object):
+    """webtoons image downloader"""
 
-# dict: {tag:num_of_tag}
-tag_num = dict(collections.Counter(itertools.chain.from_iterable(tag_dict.values())))
+    def __init__(self, jsonfile):
+        """set data directories of dataset
+        Args:
+            jsonfile : jsonfile generated from WebToonCrawler
+        """
 
-temp = {k:[str(v)] for k,v in tag_num.items()}
-
-"""
-temp = {}
-for k, v in tag_num.items():
-	if v > 100000:
-		temp[k] = v
-"""
-num_num = dict(collections.Counter(itertools.chain.from_iterable(temp.values())))
+        self.DATA_DIR = '/home/siit/navi/data/webtoonsDB'
+        self.IMAGE_DATA = os.path.join(self.DATA_DIR, 'imageset')
+        self.JSON_DIR = os.path.join(self.DATA_DIR, jsonfile)
+        self.JSON = json.load(open(self.JSON_DIR))
 
 
-result_fin = num_num
-result_fin = [(elem1, elem2) for elem1, elem2 in result_fin]
-result_fin = result_fin
-zip(*result_fin)
-font = {'size':5}
-matplotlib.rc('font', **font)
+    def download(self):
+        """download webtoon image"""
 
-plt.scatter(*zip(*result_fin), marker='.')
-"""
-lst = list(result_fin.keys())
-plt.plot(lst, [result_fin[lst[i]] for i in range(len(lst))])
-plt.ylabel('tag')
-"""
-plt.xticks(rotation=90)
+        choosed_webtoon = ['free-draw']
 
-i = 0
-while os.path.isfile('dic_stat{0:3}.jpg'.format(i)):
-	i += 1
+        if not os.path.exists(self.IMAGE_DATA):
+            os.mkdir(self.IMAGE_DATA)
 
-plt.savefig('dic_stat{0:3}.jpg'.format(i))
+        for webtoon, img in self.JSON.items():
+            WEBTOON_PATH = os.path.join(self.IMAGE_DATA, webtoon)
+            if os.path.exists(WEBTOON_PATH):
+                print('[INFO] FOLDER EXISTS')
+                #continue
+            else:
+                os.mkdir(WEBTOON_PATH)
+                
+            ##################################################################################
+            """control number of episodes to download if webtoon is not in choosed_webtoon"""#
+            ##################################################################################
+            if webtoon not in choosed_webtoon:
+                for k in range(6,len(img)+1):
+                    try:
+                        del img[str(k)]
+                    except:
+                        print('{} not exists'.format(k))
 
+            """start downloding"""
+            for epi, img_url_list in tqdm.tqdm(img.items()):
+                EPISODE_PATH = os.path.join(WEBTOON_PATH, epi)
+
+                if os.path.exists(EPISODE_PATH):
+                    print("[INFO] episode {} exists".format(epi))
+                else:
+                    os.mkdir(EPISODE_PATH)
+                    try:
+                        for i, img_url in enumerate(img_url_list):
+
+                            req = urllib.request.Request(img_url)
+                            req.add_header("User-Agent", "Mozilla/5.0 (Windows NT 6.0; WOW64; rv:24.0) Gecko/20100101 Firefox/24.0")
+                            req.add_header('Referer', 'https://comic.naver.com')
+                            with open(os.path.join(EPISODE_PATH, "{}_{}.png".format(webtoon, i)), 'wb') as f:
+                                try:
+                                    f.write(urllib.request.urlopen(req).read())
+                                except:
+                                    print("Failed {}_{}.png".format(webtoon, i))
+                                    with open(os.path.join(self.DATA_DIR, 'failed_list.txt', 'w')) as f:
+                                        f.write("{}_{}.png".format(webtoon, i))
+                    except:
+                        print("{} {} exists".format(webtoon, epi))
+
+
+def run():
+    downloader = ImageDownLoader('webtoons.json')
+    downloader.download()
+
+if __name__ == '__main__':
+    run()
