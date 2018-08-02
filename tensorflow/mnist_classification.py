@@ -1,8 +1,10 @@
 import tensorflow as tf
+import nsml
+from nsml import DATASET_PATH
 
 from tensorflow.examples.tutorials.mnist import input_data
 
-mnist = input_data.read_data_sets("./mnist/data/", one_hot=True)
+mnist = input_data.read_data_sets(DATASET_PATH, one_hot=True)
 input_shape = 4096
 X = tf.placeholder(tf.float32, [None, input_shape])
 
@@ -48,3 +50,4 @@ accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 print('Accuracy:', sess.run(accuracy,
                         feed_dict={X: mnist.test.images,
                                    Y: mnist.test.labels}))
+
