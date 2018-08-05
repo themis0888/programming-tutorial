@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/data/mnist_png/')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
+parser.add_argument('--checkpoint_path', type=str, dest='checkpoint_path', default='./checkpoints')
 config, unparsed = parser.parse_known_args() 
 
 sess = tf.InteractiveSession()
@@ -40,6 +41,7 @@ optimizer = tf.train.AdamOptimizer(0.001).minimize(cost)
 
 init = tf.global_variables_initializer()
 sess.run(init)
+# saver.restore(sess, os.path.join(config.checkpoint_path, 'fc_network_{}'.format(10)))
 
 
 # -------------------- Learning -------------------- #
@@ -55,7 +57,7 @@ saver = tf.train.Saver()
 
 label_list = [str(i) for i in range(config.n_classes)]
 
-for epoch in range(5):
+for epoch in range(15):
 	for list_file in list_files:
 
 		with open(list_file) as f:
@@ -77,7 +79,7 @@ for epoch in range(5):
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
 			Xbatch, Ybatch, _ = data_loader.queue_data(
-				train_data[i*batch_size:(i+1)*batch_size], label_list, convert = 'rgb2gray')
+				train_data[i*batch_size:(i+1)*batch_size], label_list)
 	
 			_, cost_val = sess.run([optimizer, cost], feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
@@ -85,20 +87,20 @@ for epoch in range(5):
 	print('Epoch:', '%04d' % (epoch + 1),
 		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
 
-	"""
+	# Save the model
 	if epoch % 5 == 0:
-		if not os.path.exists('{0:03d}_epoch_model'.format(epoch)):
-			os.mkdir('{0:03d}_epoch_model'.format(epoch))
-		saver.save(sess, '{0:03d}_epoch_model'.format(epoch))
-	"""
+		if not os.path.exists(config.checkpoint_path):
+			os.mkdir(config.checkpoint_path)
+		saver.save(sess, os.path.join(config.checkpoint_path, 
+			'fc_network_{0:03d}'.format(epoch)))
+	
 
 # -------------------- Testing -------------------- #
-
 
 is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
 accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 Xbatch, Ybatch, _ = data_loader.queue_data(
-	test_data, label_list, convert = 'rgb2gray')
+	test_data, label_list)
 
 accuracy_ = sess.run(accuracy, feed_dict = {X: Xbatch, Y: Ybatch})
 print('Accuracy:', accuracy_)
