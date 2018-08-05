@@ -5,10 +5,9 @@ CUDA_VISIBLE_DEVICES=0 python -i mnist_classification.py \
 import tensorflow as tf
 import nsml
 from nsml import DATASET_PATH
-import os
+import os, random
 import data_loader
-
-from tensorflow.examples.tutorials.mnist import input_data
+import numpy as np
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -23,12 +22,12 @@ sess = tf.InteractiveSession()
 
 depth = 7
 input_shape = 784
-X = tf.placeholder(tf.float32, [None, 28, 28, 3])
+X = tf.placeholder(tf.float32, [None, 28, 28])
 Y = tf.placeholder(tf.float32, [None, 10])
 
 input_shape = 784
 
-input_layer = tf.reshape(X, [-1, 28*28*3]) 
+input_layer = tf.reshape(X, [-1, 28*28])
 input_layer = tf.contrib.layers.flatten(input_layer)
 
 fc = tf.layers.dense(inputs = input_layer, units = 256, activation = tf.nn.relu)
@@ -55,48 +54,55 @@ list_files = [os.path.join(dp, f)
 		for f in filenames if 'path_label_list' in f]
 list_files.sort()
 
-list_file = list_files[0]
 batch_size = config.batch_size
-with open(list_file) as f:
-	for num_file, l in enumerate(f):
-		pass
-
-print('Number of input files: \t{}'.format(num_file))
-total_batch = int(num_file / batch_size)
 saver = tf.train.Saver()
 
-tf.train.start_queue_runners(sess=sess)
+label_list = [str(i) for i in range(config.n_classes)]
 
-for epoch in range(15):
-	total_cost = 0
-	Xbatch, Ybatch = data_loader.queue_data(
-			list_file, config.n_classes, config.batch_size, 'train', multi_label=False)
+for epoch in range(5):
+	for list_file in list_files:
 
-	for i in range(total_batch):
-		# Xbatch and Ybatch are tensor, which is not feedable to the placeholder.
-		print('Data loading')
-		#xbatch, ybatch = sess.run([Xbatch, Ybatch])
-		print('Hello :D I am going through the {}th iteration'.format(i))
-		_, cost_val = sess.run([optimizer, cost], feed_dict={X: Xbatch, Y: Ybatch})
-		total_cost += cost_val
+		with open(list_file) as f:
+			path_label_list = f.read().split('\n')
+			# You should shuffle the list. 
+			# The network will be stupid if you don't  
+			random.shuffle(path_label_list)
+			train_data = [line for line in path_label_list
+			if 'train' in line]
+			test_data = [line for line in path_label_list
+			if 'test' in line]
+
+			num_file = len(train_data)
+
+		# print('Number of input files: \t{}'.format(num_file))
+		total_batch = int(num_file / batch_size)
+		total_cost = 0
+
+		for i in range(total_batch):
+			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
+			Xbatch, Ybatch, _ = data_loader.queue_data(
+				train_data[i*batch_size:(i+1)*batch_size], label_list, convert = 'rgb2gray')
+	
+			_, cost_val = sess.run([optimizer, cost], feed_dict={X: Xbatch, Y: Ybatch})
+			total_cost += cost_val
 
 	print('Epoch:', '%04d' % (epoch + 1),
-		'Avg. cost =', '{:.3f}'.format(total_cost / total_batch))
+		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
 
+	"""
 	if epoch % 5 == 0:
 		if not os.path.exists('{0:03d}_epoch_model'.format(epoch)):
 			os.mkdir('{0:03d}_epoch_model'.format(epoch))
 		saver.save(sess, '{0:03d}_epoch_model'.format(epoch))
-
+	"""
 
 # -------------------- Testing -------------------- #
 
-is_correct = tf.equal(tf.argmax(model, 1), tf.argmax(Y, 1))
+is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
 accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
-X, Y = data_loader.queue_data(
-			list_file, config.n_classes, config.batch_size, 'val', multi_label=False)
+Xbatch, Ybatch, _ = data_loader.queue_data(
+	test_data, label_list, convert = 'rgb2gray')
 
-accuracy = sess.run(accuracy, feed_dict = {X: mnist.test.images,
-								Y: mnist.test.labels})
-print('Accuracy:', accuracy)
+accuracy_ = sess.run(accuracy, feed_dict = {X: Xbatch, Y: Ybatch})
+print('Accuracy:', accuracy_)
 
