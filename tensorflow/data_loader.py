@@ -8,8 +8,12 @@ from nsml import DATASET_PATH
 import os
 import cv2 as cv
 import numpy as np
+# from PIL import Image as im
+import imageio as im
 
-im_size = [28, 28, 3]
+# /shared/data/mnist_png/train/0/1.png
+
+im_size = [28, 28]
 # queue_data(lst, ['0', '1', '2'], norm=True, convert = 'rgb2gray')
 # queue_data does not consider the batch size but return the all data on the list.
 def queue_data(file_list, label_list, norm=True, convert = None):
@@ -26,8 +30,8 @@ def queue_data(file_list, label_list, norm=True, convert = None):
 		# return the index of the label 
 		gt_labels.append(input_label)
 		input_labels.append(label_list.index(input_label))
-		im = cv.imread(impath)
-		im_batch[i] = im
+		img = np.asarray(im.imread(impath))
+		im_batch[i] = img
 
 	if norm == True : 
 		im_batch /= 256
