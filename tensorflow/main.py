@@ -1,6 +1,7 @@
 import tensorflow as tf
 import nsml
 from nsml import DATASET_PATH
+import os 
 
 from tensorflow.examples.tutorials.mnist import input_data
 
@@ -31,23 +32,29 @@ sess.run(init)
 
 batch_size = 100
 total_batch = int(mnist.train.num_examples / batch_size)
+saver = tf.train.Saver()
 
-for epoch in range(15):
-    total_cost = 0
+for epoch in range(150):
+	total_cost = 0
 
-    for i in range(total_batch):
-        batch_xs, batch_ys = mnist.train.next_batch(batch_size)
+	for i in range(total_batch):
+		batch_xs, batch_ys = mnist.train.next_batch(batch_size)
 
-        _, cost_val = sess.run([optimizer, cost], feed_dict={X: batch_xs, Y: batch_ys})
-        total_cost += cost_val
+		_, cost_val = sess.run([optimizer, cost], feed_dict={X: batch_xs, Y: batch_ys})
+		total_cost += cost_val
 
-    print('Epoch:', '%04d' % (epoch + 1),
-          'Avg. cost =', '{:.3f}'.format(total_cost / total_batch))
-
+	print('Epoch:', '%04d' % (epoch + 1),
+		  'Avg. cost =', '{:.3f}'.format(total_cost / total_batch))
+	
+	if epoch % 10 == 0:
+		if not os.path.exists('{0:03d}_epoch_model'.format(epoch)):
+			os.mkdir('{0:03d}_epoch_model'.format(epoch))
+		saver.save(sess, '{0:03d}_epoch_model'.format(epoch))
+	
 
 is_correct = tf.equal(tf.argmax(model, 1), tf.argmax(Y, 1))
 accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 print('Accuracy:', sess.run(accuracy,
-                        feed_dict={X: mnist.test.images,
-                                   Y: mnist.test.labels}))
+						feed_dict={X: mnist.test.images,
+								   Y: mnist.test.labels}))
 
