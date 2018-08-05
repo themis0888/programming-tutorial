@@ -30,7 +30,7 @@ def queue_data(file_list, label_list, norm=True, convert = None):
 		im_batch[i] = im
 
 	if norm == True : 
-		im_batch /= 256*batch_size
+		im_batch /= 256
 	if convert == 'rgb2gray':
 		im_batch = np.mean(im_batch, axis=3)
 
