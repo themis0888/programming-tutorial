@@ -1,5 +1,5 @@
 """
-CUDA_VISIBLE_DEVICES=0 python -i mnist_classification.py \
+CUDA_VISIBLE_DEVICES=0 python -i classifier.py \
 --data_path=/shared/data/mnist_png
 """
 import tensorflow as tf
@@ -12,6 +12,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/data/mnist_png/')
+parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/data/mnist_png/meta/')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
 parser.add_argument('--checkpoint_path', type=str, dest='checkpoint_path', default='./checkpoints')
@@ -44,11 +45,12 @@ sess.run(init)
 # saver.restore(sess, os.path.join(config.checkpoint_path, 'fc_network_{}'.format(10)))
 
 
-# -------------------- Learning -------------------- #
+# -------------------- Data maniging -------------------- #
 
+
+data_loader.make_list_file(config.data_path, config.list_path, ('.png', '.jpg'), True, 1)
 list_files = [os.path.join(dp, f)
-		for dp, dn, filenames in os.walk(
-			os.path.join(config.data_path, 'meta')) 
+		for dp, dn, filenames in os.walk(config.list_path) 
 		for f in filenames if 'path_label_list' in f]
 list_files.sort()
 
@@ -56,6 +58,9 @@ batch_size = config.batch_size
 saver = tf.train.Saver()
 
 label_list = [str(i) for i in range(config.n_classes)]
+
+
+# -------------------- Learning -------------------- #
 
 for epoch in range(15):
 	for list_file in list_files:
