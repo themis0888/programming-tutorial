@@ -1,17 +1,57 @@
 """
 CUDA_VISIBLE_DEVICES=0 python -i mnist_classification.py \
---data_path=/shared/data/mnist_png
+#--data_path=/shared/data/mnist_png
 """
 import tensorflow as tf
 import nsml
 from nsml import DATASET_PATH
 import os
-import cv2 as cv
+#import cv2 as cv
 import numpy as np
 # from PIL import Image as im
 import imageio as im
 
+
+# extensions = ('.jpg', '.png')
 # /shared/data/mnist_png/train/0/1.png
+
+# fine_list: str, list, bool, bool -> list of str
+# Find the file list recursively 
+def file_list(path, extensions, sort=True, path_label = False):
+	if path_label == True:
+		result = [(os.path.join(dp, f) + ' ' + os.path.join(dp, f).split('/')[-2])
+		for dp, dn, filenames in os.walk(path) 
+		for f in filenames if os.path.splitext(f)[1] in extensions]
+	else:
+		result = [os.path.join(dp, f) for dp, dn, filenames in os.walk(path) 
+		for f in filenames if os.path.splitext(f)[1] in extensions]
+	if sort:
+		result.sort()
+
+	return result
+
+
+
+def make_list_file(path, save_path, extensions, path_label = False, iter = 1):
+	# make the save dir if it is not exists
+	#save_path = os.path.join(path, 'meta')
+	if not os.path.exists(save_path):
+		os.mkdir(save_path)
+	print('Finding all input files...')
+	file_lst = file_list(path, extensions, True, path_label)
+	lenth = len(file_lst)
+
+	print('Writing input file list...')
+	for itr in range(iter):
+		# save the file inside of the meta/ folder
+		f = open(os.path.join(save_path, 'path_label_list{0:03d}.txt'.format(itr)), 'w')
+		for line in file_lst[int((itr)*lenth/iter):int((itr+1)*lenth/iter)]:
+			f.write(line + '\n')
+		f.close()
+
+	print('Listing completed...')
+
+
 
 im_size = [28, 28]
 # queue_data(lst, ['0', '1', '2'], norm=True, convert = 'rgb2gray')
