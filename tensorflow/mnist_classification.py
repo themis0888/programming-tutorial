@@ -20,12 +20,8 @@ sess = tf.InteractiveSession()
 
 # -------------------- Model -------------------- #
 
-depth = 7
-input_shape = 784
 X = tf.placeholder(tf.float32, [None, 28, 28])
 Y = tf.placeholder(tf.float32, [None, 10])
-
-input_shape = 784
 
 input_layer = tf.reshape(X, [-1, 28*28])
 input_layer = tf.contrib.layers.flatten(input_layer)
@@ -97,6 +93,7 @@ for epoch in range(5):
 	"""
 
 # -------------------- Testing -------------------- #
+
 
 is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
 accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
