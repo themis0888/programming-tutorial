@@ -61,7 +61,7 @@ saver = tf.train.Saver()
 
 label_list = [str(i) for i in range(config.n_classes)]
 
-for epoch in range(15):
+for epoch in range(1):
 	for list_file in list_files:
 
 		with open(list_file) as f:
@@ -108,3 +108,5 @@ Xbatch, Ybatch, _ = data_loader.queue_data(
 
 accuracy_ = sess.run(accuracy, feed_dict = {X: Xbatch, Y: Ybatch})
 print('Accuracy:', accuracy_)
+
+f = open
