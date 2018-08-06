@@ -40,10 +40,15 @@ logits = tf.layers.dense(inputs= fc, units=10)
 cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=Y))
 optimizer = tf.train.AdamOptimizer(0.001).minimize(cost)
 
+is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
+accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+
 init = tf.global_variables_initializer()
 sess.run(init)
 # saver.restore(sess, os.path.join(config.checkpoint_path, 'fc_network_{}'.format(10)))
-
+writer = tf.summary.FileWriter("./board/sample", sess.graph)
+acc_hist = tf.summary.scalar("Training accuracy", accuracy)
+merged = tf.summary.merge_all()
 
 # -------------------- Data maniging -------------------- #
 
@@ -80,18 +85,21 @@ for epoch in range(15):
 		# print('Number of input files: \t{}'.format(num_file))
 		total_batch = int(num_file / batch_size)
 		total_cost = 0
+		final_acc = 0
 
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
 			Xbatch, Ybatch, _ = data_loader.queue_data(
 				train_data[i*batch_size:(i+1)*batch_size], label_list)
 	
-			_, cost_val = sess.run([optimizer, cost], feed_dict={X: Xbatch, Y: Ybatch})
+			_, cost_val, acc = sess.run([optimizer, cost, merged], feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
+
 
 	print('Epoch:', '%04d' % (epoch + 1),
 		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
 
+	writer.add_summary(acc, epoch)
 	# Save the model
 	if epoch % 5 == 0:
 		if not os.path.exists(config.checkpoint_path):
@@ -102,8 +110,7 @@ for epoch in range(15):
 
 # -------------------- Testing -------------------- #
 
-is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
-accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+
 Xbatch, Ybatch, _ = data_loader.queue_data(
 	test_data, label_list)
 
