@@ -1,6 +1,6 @@
 """
 CUDA_VISIBLE_DEVICES=0 python -i classifier.py \
-#--data_path=/shared/data/mnist_png
+--data_path=/shared/data/mnist_png
 """
 import tensorflow as tf
 import nsml
@@ -9,21 +9,16 @@ import os, random
 import data_loader
 import numpy as np
 import argparse
-from tfskeleton.ns import bind_model
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', type=str, dest='data_path', default=os.path.join(DATASET_PATH, 'train'))
-parser.add_argument('--list_path', type=str, dest='list_path', default='./meta/')
+parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/data/mnist_png/')
+parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/data/mnist_png/meta/')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
 parser.add_argument('--checkpoint_path', type=str, dest='checkpoint_path', default='./checkpoints')
-parser.add_argument('--path_label', type=bool, dest='path_label', default=True)
-parser.add_argument('--iter', type=int, dest='iter', default=1)
 config, unparsed = parser.parse_known_args() 
 
 sess = tf.InteractiveSession()
-bind_model(sess=sess)
-# print(os.path.exists(DATASET_PATH,train,'0','1.png'))
 
 # -------------------- Model -------------------- #
 
@@ -42,15 +37,21 @@ logits = tf.layers.dense(inputs= fc, units=10)
 
 # -------------------- Objective -------------------- #
 
-cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=Y))
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=Y))
 optimizer = tf.train.AdamOptimizer(0.001).minimize(cost)
+
+is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
+accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
 init = tf.global_variables_initializer()
 sess.run(init)
 # saver.restore(sess, os.path.join(config.checkpoint_path, 'fc_network_{}'.format(10)))
+writer = tf.summary.FileWriter("./board/sample", sess.graph)
+acc_hist = tf.summary.scalar("Training accuracy", accuracy)
+merged = tf.summary.merge_all()
 
+# -------------------- Data maniging -------------------- #
 
-# -------------------- Learning -------------------- #
 
 data_loader.make_list_file(config.data_path, config.list_path, ('.png', '.jpg'), True, 1)
 list_files = [os.path.join(dp, f)
@@ -63,7 +64,10 @@ saver = tf.train.Saver()
 
 label_list = [str(i) for i in range(config.n_classes)]
 
-for epoch in range(50):
+
+# -------------------- Learning -------------------- #
+
+for epoch in range(15):
 	for list_file in list_files:
 
 		with open(list_file) as f:
@@ -81,34 +85,35 @@ for epoch in range(50):
 		# print('Number of input files: \t{}'.format(num_file))
 		total_batch = int(num_file / batch_size)
 		total_cost = 0
+		final_acc = 0
 
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
 			Xbatch, Ybatch, _ = data_loader.queue_data(
 				train_data[i*batch_size:(i+1)*batch_size], label_list)
 	
-			_, cost_val = sess.run([optimizer, cost], feed_dict={X: Xbatch, Y: Ybatch})
+			_, cost_val, acc = sess.run([optimizer, cost, merged], feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
+
 
 	print('Epoch:', '%04d' % (epoch + 1),
 		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
 
+	writer.add_summary(acc, epoch)
 	# Save the model
 	if epoch % 5 == 0:
 		if not os.path.exists(config.checkpoint_path):
 			os.mkdir(config.checkpoint_path)
 		saver.save(sess, os.path.join(config.checkpoint_path, 
 			'fc_network_{0:03d}'.format(epoch)))
-		nsml.save(epoch)
-
 	
 
 # -------------------- Testing -------------------- #
 
-is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
-accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+
 Xbatch, Ybatch, _ = data_loader.queue_data(
 	test_data, label_list)
 
 accuracy_ = sess.run(accuracy, feed_dict = {X: Xbatch, Y: Ybatch})
 print('Accuracy:', accuracy_)
+
