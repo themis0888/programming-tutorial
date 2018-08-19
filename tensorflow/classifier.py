@@ -3,11 +3,6 @@ CUDA_VISIBLE_DEVICES=0 python -i classifier.py \
 --data_path=/shared/data/mnist_png
 """
 import tensorflow as tf
-import nsml
-from nsml import DATASET_PATH
-import os, random
-import data_loader
-import numpy as np
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -15,8 +10,14 @@ parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/
 parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/data/mnist_png/meta/')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
+
 parser.add_argument('--checkpoint_path', type=str, dest='checkpoint_path', default='./checkpoints')
+parser.add_argument('--nsml', type=bool, dest='nsml', default=False)
 config, unparsed = parser.parse_known_args() 
+
+import os, random
+import data_loader
+import numpy as np\
 
 sess = tf.InteractiveSession()
 
