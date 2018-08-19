@@ -3,13 +3,15 @@ CUDA_VISIBLE_DEVICES=0 python -i mnist_classification.py \
 #--data_path=/shared/data/mnist_png
 """
 import tensorflow as tf
-import nsml
-from nsml import DATASET_PATH
 import os
 #import cv2 as cv
 import numpy as np
 # from PIL import Image as im
 import imageio as im
+from classifier import config
+if config.nsml:
+	import nsml
+	from nsml import DATASET_PATH
 
 
 # extensions = ('.jpg', '.png')
@@ -70,7 +72,7 @@ def queue_data(file_list, label_list, norm=True, convert = None):
 		# return the index of the label 
 		gt_labels.append(input_label)
 		input_labels.append(label_list.index(input_label))
-		img = np.asarray(im.imread(impath))
+		img = np.asarray(skio.imread(impath))
 		im_batch[i] = img
 
 	if norm == True : 
