@@ -1,6 +1,7 @@
 """
-CUDA_VISIBLE_DEVICES=0 python -i classifier.py \
---data_path=/shared/data/mnist_png
+CUDA_VISIBLE_DEVICES=0 python -i transfer_learning.py \
+--data_path=/shared/data/catdog \
+--n_classes=2 
 """
 import tensorflow as tf
 import argparse
@@ -36,16 +37,16 @@ channels = 3
 im_size = [height, width, channels]
 
 X = tf.placeholder(tf.float32, shape=[None] + im_size)
-Y = tf.placeholder(tf.float32, [None, 10])
+Y = tf.placeholder(tf.float32, [None, config.n_classes])
 with slim.arg_scope(vgg.vgg_arg_scope()):
-	logits, end_points = vgg.vgg_19(X, num_classes=1000, is_training=False)
+	logits, end_points = vgg.vgg_19(X, num_classes=1000, is_training=True)
 	feat_layer = end_points['vgg_19/fc7']
 	all_vars = tf.all_variables()
 	var_to_restore = [v for v in all_vars]
 
 feat_layer = tf.reshape(feat_layer, [-1, 4096])
 # Output logits Layer
-logits = tf.layers.dense(inputs= feat_layer, units=10)
+logits = tf.layers.dense(inputs= feat_layer, units=config.n_classes)
 
 
 # -------------------- Objective -------------------- #
@@ -78,7 +79,7 @@ list_files.sort()
 
 batch_size = config.batch_size
 
-label_list = [str(i) for i in range(config.n_classes)]
+label_list = ['cat', 'dog']
 
 
 # -------------------- Learning -------------------- #
@@ -106,13 +107,13 @@ for epoch in range(15):
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
 			Xbatch, Ybatch, _ = data_loader.queue_data(
-				train_data[i*batch_size:(i+1)*batch_size], label_list)
+				train_data[i*batch_size:(i+1)*batch_size], label_list, im_size)
 	
 			_, cost_val, acc = sess.run([optimizer, cost, merged], feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
 
 			if np.mod(i, 10) == 0:
-				print('Epoch:', '%04d' % (epoch + 1),
+				print('Epoch:', '%02d' % (epoch + 1),
 					'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
 
 	print('Epoch:', '%04d' % (epoch + 1),
