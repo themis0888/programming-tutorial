@@ -4,14 +4,10 @@ CUDA_VISIBLE_DEVICES=0 python -i mnist_classification.py \
 """
 import tensorflow as tf
 import os
-#import cv2 as cv
 import numpy as np
-# from PIL import Image as im
 import imageio as im
-from classifier import config
-if config.nsml:
-	import nsml
-	from nsml import DATASET_PATH
+import skimage.io as skio
+import scipy.misc
 
 
 # extensions = ('.jpg', '.png')
@@ -55,10 +51,9 @@ def make_list_file(path, save_path, extensions, path_label = False, iter = 1):
 
 
 
-im_size = [28, 28]
 # queue_data(lst, ['0', '1', '2'], norm=True, convert = 'rgb2gray')
 # queue_data does not consider the batch size but return the all data on the list.
-def queue_data(file_list, label_list, norm=True, convert = None):
+def queue_data(file_list, label_list, im_size = [28,28], norm=True, convert = None):
 	# Batch frame fit into the image size 
 	batch_size = len(file_list)
 	im_batch = np.zeros([batch_size] + im_size)
@@ -73,6 +68,10 @@ def queue_data(file_list, label_list, norm=True, convert = None):
 		gt_labels.append(input_label)
 		input_labels.append(label_list.index(input_label))
 		img = np.asarray(skio.imread(impath))
+		if img.ndim < 3:
+			img = np.expand_dims(img, axis = -1)
+			img = np.concatenate((img, img, img), axis = -1)
+		img = mat_resize(img, im_size)
 		im_batch[i] = img
 
 	if norm == True : 
@@ -87,3 +86,16 @@ def queue_data(file_list, label_list, norm=True, convert = None):
 
 	return im_batch, one_hot_labels, gt_labels
 
+
+def mat_resize(npy_file, fine_size):
+    img = npy_file
+    img_layer = []
+    for i in range(img.shape[-1]):
+        img_layer.append(np.zeros(fine_size))
+        img_layer[i] = scipy.misc.imresize(img[:,:,i], fine_size)
+        img_layer[i] = np.expand_dims(img_layer[i], axis = -1)
+        if i == 0:
+            img_concat = img_layer[i]
+        else:
+            img_concat = np.concatenate((img_concat, img_layer[i]), axis = -1)
+    return img_concat

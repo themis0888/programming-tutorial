@@ -17,11 +17,13 @@ config, unparsed = parser.parse_known_args()
 
 import os, random
 import data_loader
-import numpy as np\
+import numpy as np
 
 sess = tf.InteractiveSession()
 
 # -------------------- Model -------------------- #
+
+im_size = [28, 28]
 
 X = tf.placeholder(tf.float32, [None, 28, 28])
 Y = tf.placeholder(tf.float32, [None, 10])
@@ -91,7 +93,8 @@ for epoch in range(15):
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
 			Xbatch, Ybatch, _ = data_loader.queue_data(
-				train_data[i*batch_size:(i+1)*batch_size], label_list)
+				train_data[i*batch_size:(i+1)*batch_size], label_list,
+				im_size)
 	
 			_, cost_val, acc = sess.run([optimizer, cost, merged], feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
