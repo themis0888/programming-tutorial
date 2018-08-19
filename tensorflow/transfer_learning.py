@@ -3,11 +3,6 @@ CUDA_VISIBLE_DEVICES=0 python -i classifier.py \
 --data_path=/shared/data/mnist_png
 """
 import tensorflow as tf
-import nsml
-from nsml import DATASET_PATH
-import os, random
-import data_loader
-import numpy as np
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -15,25 +10,43 @@ parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/
 parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/data/mnist_png/meta/')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
+parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
+
 parser.add_argument('--checkpoint_path', type=str, dest='checkpoint_path', default='./checkpoints')
+parser.add_argument('--nsml', type=bool, dest='nsml', default=False)
 config, unparsed = parser.parse_known_args() 
 
-sess = tf.InteractiveSession()
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=config.memory_usage)
+sess = tf.InteractiveSession(config=tf.ConfigProto(gpu_options=gpu_options))
+
+import os, random
+import data_loader
+import numpy as np
+import tensorflow.contrib.slim.nets as nets
+
 
 # -------------------- Model -------------------- #
 
-X = tf.placeholder(tf.float32, [None, 28, 28])
+slim = tf.contrib.slim
+vgg = nets.vgg
+
+height = 224
+width = 224
+channels = 3
+im_size = [height, width, channels]
+
+X = tf.placeholder(tf.float32, shape=[None] + im_size)
 Y = tf.placeholder(tf.float32, [None, 10])
+with slim.arg_scope(vgg.vgg_arg_scope()):
+	logits, end_points = vgg.vgg_19(X, num_classes=1000, is_training=False)
+	feat_layer = end_points['vgg_19/fc7']
+	all_vars = tf.all_variables()
+	var_to_restore = [v for v in all_vars]
 
-input_layer = tf.reshape(X, [-1, 28*28])
-input_layer = tf.contrib.layers.flatten(input_layer)
-
-fc = tf.layers.dense(inputs = input_layer, units = 256, activation = tf.nn.relu)
-fc = tf.layers.dense(inputs = fc, units = 256, activation = tf.nn.relu)
-fc = tf.layers.dense(inputs = fc, units = 128, activation = tf.nn.relu)
-
+feat_layer = tf.reshape(feat_layer, [-1, 4096])
 # Output logits Layer
-logits = tf.layers.dense(inputs= fc, units=10)
+logits = tf.layers.dense(inputs= feat_layer, units=10)
+
 
 # -------------------- Objective -------------------- #
 
@@ -43,15 +56,19 @@ optimizer = tf.train.AdamOptimizer(0.001).minimize(cost)
 is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
 accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
-init = tf.global_variables_initializer()
-sess.run(init)
-# saver.restore(sess, os.path.join(config.checkpoint_path, 'fc_network_{}'.format(10)))
 writer = tf.summary.FileWriter("./board/sample", sess.graph)
 acc_hist = tf.summary.scalar("Training accuracy", accuracy)
 merged = tf.summary.merge_all()
 
-# -------------------- Data maniging -------------------- #
+init = tf.global_variables_initializer()
+sess.run(init)
 
+tf.train.start_queue_runners(sess=sess)
+saver = tf.train.Saver(var_to_restore)
+saver.restore(sess, "/shared/data/models/vgg_19.ckpt")
+
+
+# -------------------- Data maniging -------------------- #
 
 data_loader.make_list_file(config.data_path, config.list_path, ('.png', '.jpg'), True, 1)
 list_files = [os.path.join(dp, f)
@@ -60,7 +77,6 @@ list_files = [os.path.join(dp, f)
 list_files.sort()
 
 batch_size = config.batch_size
-saver = tf.train.Saver()
 
 label_list = [str(i) for i in range(config.n_classes)]
 
@@ -95,6 +111,9 @@ for epoch in range(15):
 			_, cost_val, acc = sess.run([optimizer, cost, merged], feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
 
+			if np.mod(i, 10) == 0:
+				print('Epoch:', '%04d' % (epoch + 1),
+					'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
 
 	print('Epoch:', '%04d' % (epoch + 1),
 		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
