@@ -1,8 +1,8 @@
 """
-CUDA_VISIBLE_DEVICES=0 python -i transfer_learning.py \
+CUDA_VISIBLE_DEVICES=0 python -i transfer_learning_v2.py \
 --data_path=/shared/data/celeb_cartoon/anime/ \
 --n_classes=34 --lable_processed True \
---list_path=./
+--list_path=.
 """
 import tensorflow as tf
 import argparse
@@ -13,7 +13,7 @@ parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
 parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
-parser.add_argument('--lable_processed', type=bool, dest='lable_processed', default=False)
+parser.add_argument('--lable_processed', type=bool, dest='lable_processed', default=True)
 
 parser.add_argument('--checkpoint_path', type=str, dest='checkpoint_path', default='./checkpoints')
 parser.add_argument('--nsml', type=bool, dest='nsml', default=False)
@@ -76,7 +76,7 @@ saver.restore(sess, "/shared/data/models/vgg_19.ckpt")
 # data_loader.make_list_file(config.data_path, config.list_path, ('.png', '.jpg'), True, 1)
 list_files = [os.path.join(dp, f)
 		for dp, dn, filenames in os.walk(config.list_path) 
-		for f in filenames if 'path_label_list' in f]
+		for f in filenames if 'dict.npy' in f]
 list_files.sort()
 
 batch_size = config.batch_size
@@ -89,16 +89,18 @@ label_list = ['cat', 'dog']
 for epoch in range(15):
 	for list_file in list_files:
 
-		with open(list_file) as f:
-			path_label_list = f.read().split('\n')
-			# You should shuffle the list. 
-			# The network will be stupid if you don't  
-			random.shuffle(path_label_list)
-			all_data = [line for line in path_label_list]
-			train_data = all_data[1000:]
-			test_data = all_data[:1000]
+		f = np.load(list_file)
+		
+		path_label_dict = f.item()
+		input_file_list = list(path_label_dict.keys())
+		# You should shuffle the list. 
+		# The network will be stupid if you don't  
+		random.shuffle(input_file_list)
+		all_data = [line for line in input_file_list]
+		train_data = all_data[1000:]
+		test_data = all_data[:1000]
 
-			num_file = len(train_data)
+		num_file = len(train_data)
 
 		if num_file ==0:
 			break
@@ -110,8 +112,14 @@ for epoch in range(15):
 
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
-			Xbatch, Ybatch, _ = data_loader.queue_data(
-				train_data[i*batch_size:(i+1)*batch_size], label_list, im_size, config.lable_processed)
+			label_list = np.expand_dims(path_label_dict[train_data[i*batch_size + j]], axis = -1)
+			for j in range(1, batch_size):
+				label_list = np.concatenate((label_list, np.expand_dims(
+					path_label_dict[train_data[i*batch_size + j+1]], 
+					axis = -1)), axis = -1)
+			Ybatch = label_list
+			Xbatch = data_loader.queue_data_dict(
+				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
 	
 			_, cost_val, acc = sess.run([optimizer, cost, merged], feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val

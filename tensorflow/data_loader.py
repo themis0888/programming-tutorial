@@ -50,10 +50,29 @@ def make_list_file(path, save_path, extensions, path_label = False, iter = 1):
 	print('Listing completed...')
 
 
+def make_dict_file(path, save_path, extensions, path_label = False, iter = 1, label_list = None):
+	# make the save dir if it is not exists
+	#save_path = os.path.join(path, 'meta')
+	if not os.path.exists(save_path):
+		os.mkdir(save_path)
+	print('Finding all input files...')
+	file_lst = file_list(path, extensions, True, path_label)
+	lenth = len(file_lst)
+	path_label_dict = {}
+	print('Writing input file list...')
+	for itr in range(iter):
+		# save the file inside of the meta/ folder
+		for i in range(lenth):
+			path_label_dict[file_lst[i]] = label_list[i]
+	np.save('path_label_dict.npy', path_label_dict)
+
+	print('Listing completed...')
+
+
 
 # queue_data(lst, ['0', '1', '2'], norm=True, convert = 'rgb2gray')
 # queue_data does not consider the batch size but return the all data on the list.
-def queue_data(file_list, label_list, im_size = [28,28], label_processed = False, norm=True, convert = None):
+def queue_data_list(file_list, label_list, im_size = [28,28], label_processed = False, norm=True, convert = None):
 	# Batch frame fit into the image size 
 	batch_size = len(file_list)
 	im_batch = np.zeros([batch_size] + im_size)
@@ -64,11 +83,11 @@ def queue_data(file_list, label_list, im_size = [28,28], label_processed = False
 		impath, input_label = file_list[i].split(' % ')
 		input_label.replace('\n', '')
 		# return the index of the label 
-		gt_labels.append(input_label)
+		gt_labels.append(np.array(input_label))
 		if not label_processed:
 			input_labels.append(label_list.index(input_label))
 		else:
-			input_labels.append(input_label)
+			input_labels.append(np.array(input_label))
 		img = np.asarray(skio.imread(impath))
 		if img.ndim < 3:
 			img = np.expand_dims(img, axis = -1)
@@ -85,6 +104,31 @@ def queue_data(file_list, label_list, im_size = [28,28], label_processed = False
 		label_indices = np.array([input_labels]).reshape(-1)
 		input_labels = np.eye(n_classes)[label_indices]
 	return im_batch, input_labels, gt_labels
+
+
+def queue_data_dict(file_list, im_size = [28,28], label_processed = False, norm=True, convert = None):
+	# Batch frame fit into the image size 
+	batch_size = len(file_list)
+	im_batch = np.zeros([batch_size] + im_size)
+	gt_labels = []
+	# Reading from the list
+	for i in range(batch_size):
+		impath = file_list[i]
+		# return the index of the label 
+
+		img = np.asarray(skio.imread(impath))
+		if img.ndim < 3:
+			img = np.expand_dims(img, axis = -1)
+			img = np.concatenate((img, img, img), axis = -1)
+		img = mat_resize(img, im_size)
+		im_batch[i] = img
+	if norm == True : 
+		im_batch /= 256
+	if convert == 'rgb2gray':
+		im_batch = np.mean(im_batch, axis=3)
+	# Label processing 
+	
+	return im_batch
 
 
 def mat_resize(npy_file, fine_size):
