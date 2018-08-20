@@ -5,13 +5,19 @@ CUDA_VISIBLE_DEVICES=0 python -i transfer_learning_v2.py \
 --list_path=.
 """
 import tensorflow as tf
+import nsml
+from nsml import DATASET_PATH
+import os, random
+import data_loader
+import numpy as np
 import argparse
+from tfskeleton.ns import bind_model
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/data/mnist_png/')
-parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/data/mnist_png/meta/')
-parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
-parser.add_argument('--batch_size', type=int, dest='batch_size', default=16)
+parser.add_argument('--data_path', type=str, dest='data_path', default=os.path.join(DATASET_PATH, 'train'))
+parser.add_argument('--list_path', type=str, dest='list_path', default='.')
+parser.add_argument('--n_classes', type=int, dest='n_classes', default=34)
+parser.add_argument('--batch_size', type=int, dest='batch_size', default=20)
 parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
 parser.add_argument('--lable_processed', type=bool, dest='lable_processed', default=True)
 
@@ -21,6 +27,7 @@ config, unparsed = parser.parse_known_args()
 
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=config.memory_usage)
 sess = tf.InteractiveSession(config=tf.ConfigProto(gpu_options=gpu_options))
+bind_model(sess=sess)
 
 import os, random
 import data_loader
@@ -68,7 +75,7 @@ sess.run(init)
 
 tf.train.start_queue_runners(sess=sess)
 saver = tf.train.Saver(var_to_restore)
-saver.restore(sess, "/shared/data/models/vgg_19.ckpt")
+saver.restore(sess, os.path.join(config.data_path, 'vgg_19.ckpt'))
 
 
 # -------------------- Data maniging -------------------- #
@@ -128,8 +135,10 @@ for epoch in range(15):
 			total_cost += cost_val
 
 			if np.mod(i, 10) == 0:
-				print('Epoch:', '%02d' % (epoch + 1),
+				print('Step:', '%05d' % (i*batch_size),
 					'\tAvg. cost =', '{:.3f}'.format(cost_val))
+			if np.mod(i, 200) == 0:
+				nsml.save(i)
 
 	print('Epoch:', '%04d' % (epoch + 1),
 		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
@@ -141,10 +150,9 @@ for epoch in range(15):
 			os.mkdir(config.checkpoint_path)
 		saver.save(sess, os.path.join(config.checkpoint_path, 
 			'fc_network_{0:03d}'.format(epoch)))
-	
+
 
 # -------------------- Testing -------------------- #
-
 
 Xbatch, Ybatch, _ = data_loader.queue_data(
 	test_data, label_list, im_size)

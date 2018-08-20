@@ -50,7 +50,7 @@ def make_list_file(path, save_path, extensions, path_label = False, iter = 1):
 	print('Listing completed...')
 
 
-def make_dict_file(path, save_path, extensions, path_label = False, iter = 1, label_list = None):
+def make_dict_file(path, save_path, label_list, extensions, path_label = False, iter = 1):
 	# make the save dir if it is not exists
 	#save_path = os.path.join(path, 'meta')
 	if not os.path.exists(save_path):
@@ -64,7 +64,7 @@ def make_dict_file(path, save_path, extensions, path_label = False, iter = 1, la
 		# save the file inside of the meta/ folder
 		for i in range(lenth):
 			path_label_dict[file_lst[i]] = label_list[i]
-	np.save('path_label_dict.npy', path_label_dict)
+	np.save(os.path.join(save_path, 'path_label_dict.npy'), path_label_dict)
 
 	print('Listing completed...')
 
