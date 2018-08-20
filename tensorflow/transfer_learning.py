@@ -132,7 +132,7 @@ for epoch in range(15):
 
 
 Xbatch, Ybatch, _ = data_loader.queue_data(
-	test_data, label_list)
+	test_data, label_list, im_size)
 
 accuracy_ = sess.run(accuracy, feed_dict = {X: Xbatch, Y: Ybatch})
 print('Accuracy:', accuracy_)
