@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/data/mnist_png/')
 parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/data/mnist_png/meta/')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
-parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
+parser.add_argument('--batch_size', type=int, dest='batch_size', default=16)
 parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
 parser.add_argument('--lable_processed', type=bool, dest='lable_processed', default=True)
 
@@ -112,12 +112,13 @@ for epoch in range(15):
 
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
-			label_list = np.expand_dims(path_label_dict[train_data[i*batch_size + j]], axis = -1)
+			label_list = np.expand_dims(path_label_dict[train_data[i*batch_size]], axis = -1)
 			for j in range(1, batch_size):
 				label_list = np.concatenate((label_list, np.expand_dims(
 					path_label_dict[train_data[i*batch_size + j+1]], 
 					axis = -1)), axis = -1)
-			Ybatch = label_list
+			Ybatch = np.reshape(label_list, [batch_size, config.n_classes])
+
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
 	
@@ -126,7 +127,7 @@ for epoch in range(15):
 
 			if np.mod(i, 10) == 0:
 				print('Epoch:', '%02d' % (epoch + 1),
-					'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
+					'\tAvg. cost =', '{:.3f}'.format(cost_val))
 
 	print('Epoch:', '%04d' % (epoch + 1),
 		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
