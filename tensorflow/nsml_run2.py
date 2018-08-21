@@ -1,8 +1,5 @@
 """
-CUDA_VISIBLE_DEVICES=0 python -i transfer_learning_v2.py \
---data_path=/shared/data/celeb_cartoon/anime/ \
---n_classes=34 --lable_processed True \
---list_path=.
+nsml run -e nsml_run2.py -d anime_face
 """
 import tensorflow as tf
 import nsml
@@ -53,18 +50,19 @@ with slim.arg_scope(vgg.vgg_arg_scope()):
 	all_vars = tf.all_variables()
 	var_to_restore = [v for v in all_vars]
 
-feat_layer = tf.reshape(feat_layer, [-1, 4096])
+feat_layer2 = tf.reshape(feat_layer, [-1, 4096])
 # Output logits Layer
-logits = tf.layers.dense(inputs= feat_layer, units=config.n_classes, activation=tf.nn.sigmoid)
+logits = tf.layers.dense(inputs=feat_layer2, units=config.n_classes, activation=None)
 
 
 # -------------------- Objective -------------------- #
 
 cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=Y), name='Loss')
-optimizer = tf.train.AdamOptimizer(0.001).minimize(cost)
-
+total_var = tf.global_variables() 
+optimizer_1 = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost)#, var_list= [v for v in total_var if not v in var_to_restore])
+optimizer_2 = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost, var_list= [v for v in total_var if not v in var_to_restore])
 #is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
-accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(logits) - tf.round(Y)))
+accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(logits)) - tf.round(Y)))
 # accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
 writer = tf.summary.FileWriter("./board/sample", sess.graph)
@@ -76,12 +74,13 @@ sess.run(init)
 
 tf.train.start_queue_runners(sess=sess)
 saver = tf.train.Saver(var_to_restore)
-saver.restore(sess, os.path.join(config.data_path, 'vgg_19.ckpt'))
+saver.restore(sess, "/shared/data/models/vgg_19.ckpt")
+saver = tf.train.Saver()
 
 
 # -------------------- Data maniging -------------------- #
 
-label_file = np.load(os.path.join(config.data_path,'attributes.npz'))
+label_file = np.load(os.path.join('/shared/data/celeb_cartoon/','attributes.npz'))
 
 data_loader.make_dict_file(config.data_path, config.list_path, 
 	label_file['attributes'], ('.png', '.jpg'), False, 1)
@@ -95,8 +94,11 @@ batch_size = config.batch_size
 # label_list = ['cat', 'dog']
 
 
-# -------------------- Learning -------------------- #
+# -------------------- Training -------------------- #
 
+# feat, x, y = sess.run([feat_layer,logits, Y], feed_dict = {X: Xbatch, Y: Ybatch})
+# _ = sess.run(optimizer, feed_dict = {X: Xbatch, Y: Ybatch})
+counter = 0
 for epoch in range(15):
 	for list_file in list_files:
 
@@ -132,29 +134,33 @@ for epoch in range(15):
 
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
-	
-			_, cost_val, acc, acc_ = sess.run([optimizer, cost, merged, accuracy], 
-				feed_dict={X: Xbatch, Y: Ybatch})
+
+			# pdb.set_trace()
+			if counter < 200:
+				_, cost_val, acc, acc_ = sess.run([optimizer_1, cost, merged, accuracy], 
+					feed_dict={X: Xbatch, Y: Ybatch})
+			else:
+				_, cost_val, acc, acc_ = sess.run([optimizer_2, cost, merged, accuracy], 
+					feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
 
-			if np.mod(i, 100) == 0:
-				print('Step:', '%05d' % (int(i*batch_size/1000)),
-					'\tAvg. cost =', '{:.3f}'.format(cost_val),
-					'\tAcc: {}'.format(acc_))
-			if np.mod(i, 200) == 0:
-				nsml.save(i)
+			counter += batch_size
 
-	print('Epoch:', '%04d' % (epoch + 1),
-		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch)
-		'\tacc = {}'.format(acc))
+			if np.mod(i, 10) == 0:
+				print('Step:', '%05dk' % (int(i*batch_size/1000)),
+					'\tAvg. cost =', '{:.5f}'.format(cost_val),
+					'\tAcc: {:.5f}'.format(acc_))
+			if config.nsml:
+				if np.mod(i, 200) == 0:
+					nsml.save(i)
 
 	writer.add_summary(acc, epoch)
 	# Save the model
-	if epoch % 5 == 0:
+	if np.mod(counter, 10000) == 0:
 		if not os.path.exists(config.checkpoint_path):
 			os.mkdir(config.checkpoint_path)
 		saver.save(sess, os.path.join(config.checkpoint_path, 
-			'fc_network_{0:03d}'.format(epoch)))
+			'vgg19_{0:03d}k'.format(counter/1000)))
 
 
 # -------------------- Testing -------------------- #
