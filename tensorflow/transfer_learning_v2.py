@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/data/mnist_png/')
 parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/data/mnist_png/meta/')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
-parser.add_argument('--batch_size', type=int, dest='batch_size', default=16)
+parser.add_argument('--batch_size', type=int, dest='batch_size', default=20)
 parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
 parser.add_argument('--lable_processed', type=bool, dest='lable_processed', default=True)
 
@@ -26,6 +26,7 @@ import os, random
 import data_loader
 import numpy as np
 import tensorflow.contrib.slim.nets as nets
+import pdb
 
 
 # -------------------- Model -------------------- #
@@ -41,23 +42,24 @@ im_size = [height, width, channels]
 X = tf.placeholder(tf.float32, shape=[None] + im_size)
 Y = tf.placeholder(tf.float32, [None, config.n_classes])
 with slim.arg_scope(vgg.vgg_arg_scope()):
-	logits, end_points = vgg.vgg_19(X, num_classes=1000, is_training=True)
+	_, end_points = vgg.vgg_19(X, num_classes=1000, is_training=False)
 	feat_layer = end_points['vgg_19/fc7']
-	all_vars = tf.all_variables()
+	all_vars = tf.global_variables()
 	var_to_restore = [v for v in all_vars]
 
-feat_layer = tf.reshape(feat_layer, [-1, 4096])
+feat_layer2 = tf.reshape(feat_layer, [-1, 4096])
 # Output logits Layer
-logits = tf.layers.dense(inputs= feat_layer, units=config.n_classes)
+logits = tf.layers.dense(inputs=feat_layer2, units=config.n_classes, activation=None)
 
 
 # -------------------- Objective -------------------- #
 
 cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=Y), name='Loss')
-optimizer = tf.train.AdamOptimizer(0.001).minimize(cost)
+optimizer = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost)
 
-is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
-accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+#is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
+accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(logits)) - tf.round(Y)))
+# accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
 writer = tf.summary.FileWriter("./board/sample", sess.graph)
 acc_hist = tf.summary.scalar("Training accuracy", accuracy)
@@ -69,13 +71,15 @@ sess.run(init)
 tf.train.start_queue_runners(sess=sess)
 saver = tf.train.Saver(var_to_restore)
 saver.restore(sess, "/shared/data/models/vgg_19.ckpt")
+saver = tf.train.Saver()
 
 
 # -------------------- Data maniging -------------------- #
 
-label_file = np.load(os.path.join(config.data_path,'attributes.npz'))
+label_file = np.load(os.path.join('/shared/data/celeb_cartoon/','attributes.npz'))
 
-data_loader.make_dict_file(config.data_path, config.list_path, label_file['attributes'], ('.png', '.jpg'), False, 1)
+data_loader.make_dict_file(config.data_path, config.list_path, 
+	label_file['attributes'], ('.png', '.jpg'), False, 1)
 list_files = [os.path.join(dp, f)
 		for dp, dn, filenames in os.walk(config.list_path) 
 		for f in filenames if 'dict.npy' in f]
@@ -86,8 +90,10 @@ batch_size = config.batch_size
 # label_list = ['cat', 'dog']
 
 
-# -------------------- Learning -------------------- #
+# -------------------- Training -------------------- #
 
+# feat, x, y = sess.run([feat_layer,logits, Y], feed_dict = {X: Xbatch, Y: Ybatch})
+# _ = sess.run(optimizer, feed_dict = {X: Xbatch, Y: Ybatch})
 for epoch in range(15):
 	for list_file in list_files:
 
@@ -123,16 +129,19 @@ for epoch in range(15):
 
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
-	
-			_, cost_val, acc = sess.run([optimizer, cost, merged], feed_dict={X: Xbatch, Y: Ybatch})
+
+			# pdb.set_trace()
+			_, cost_val, acc, acc_ = sess.run([optimizer, cost, merged, accuracy], 
+				feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
 
 			if np.mod(i, 10) == 0:
-				print('Epoch:', '%02d' % (epoch + 1),
-					'\tAvg. cost =', '{:.3f}'.format(cost_val))
-
-	print('Epoch:', '%04d' % (epoch + 1),
-		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
+				print('Step:', '%05dk' % (int(i*batch_size/1000)),
+					'\tAvg. cost =', '{:.5f}'.format(cost_val),
+					'\tAcc: {:.5f}'.format(acc_))
+			if config.nsml:
+				if np.mod(i, 200) == 0:
+					nsml.save(i)
 
 	writer.add_summary(acc, epoch)
 	# Save the model

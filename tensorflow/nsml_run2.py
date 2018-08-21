@@ -55,7 +55,7 @@ with slim.arg_scope(vgg.vgg_arg_scope()):
 
 feat_layer = tf.reshape(feat_layer, [-1, 4096])
 # Output logits Layer
-logits = tf.layers.dense(inputs= feat_layer, units=config.n_classes)
+logits = tf.layers.dense(inputs= feat_layer, units=config.n_classes, activation=tf.nn.sigmoid)
 
 
 # -------------------- Objective -------------------- #
@@ -63,8 +63,9 @@ logits = tf.layers.dense(inputs= feat_layer, units=config.n_classes)
 cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=Y), name='Loss')
 optimizer = tf.train.AdamOptimizer(0.001).minimize(cost)
 
-is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
-accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+#is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
+accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(logits) - tf.round(Y)))
+# accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
 writer = tf.summary.FileWriter("./board/sample", sess.graph)
 acc_hist = tf.summary.scalar("Training accuracy", accuracy)
@@ -82,7 +83,8 @@ saver.restore(sess, os.path.join(config.data_path, 'vgg_19.ckpt'))
 
 label_file = np.load(os.path.join(config.data_path,'attributes.npz'))
 
-data_loader.make_dict_file(config.data_path, config.list_path, label_file['attributes'], ('.png', '.jpg'), False, 1)
+data_loader.make_dict_file(config.data_path, config.list_path, 
+	label_file['attributes'], ('.png', '.jpg'), False, 1)
 list_files = [os.path.join(dp, f)
 		for dp, dn, filenames in os.walk(config.list_path) 
 		for f in filenames if 'dict.npy' in f]
@@ -131,17 +133,20 @@ for epoch in range(15):
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
 	
-			_, cost_val, acc = sess.run([optimizer, cost, merged], feed_dict={X: Xbatch, Y: Ybatch})
+			_, cost_val, acc, acc_ = sess.run([optimizer, cost, merged, accuracy], 
+				feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
 
-			if np.mod(i, 10) == 0:
-				print('Step:', '%05d' % (i*batch_size),
-					'\tAvg. cost =', '{:.3f}'.format(cost_val))
+			if np.mod(i, 100) == 0:
+				print('Step:', '%05d' % (int(i*batch_size/1000)),
+					'\tAvg. cost =', '{:.3f}'.format(cost_val),
+					'\tAcc: {}'.format(acc_))
 			if np.mod(i, 200) == 0:
 				nsml.save(i)
 
 	print('Epoch:', '%04d' % (epoch + 1),
-		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch))
+		'\tAvg. cost =', '{:.3f}'.format(total_cost / total_batch)
+		'\tacc = {}'.format(acc))
 
 	writer.add_summary(acc, epoch)
 	# Save the model
@@ -154,9 +159,17 @@ for epoch in range(15):
 
 # -------------------- Testing -------------------- #
 
-Xbatch, Ybatch, _ = data_loader.queue_data(
-	test_data, label_list, im_size)
 
+label_list = np.expand_dims(path_label_dict[test_data[0]], axis = -1)
+for j in range(1, batch_size):
+	label_list = np.concatenate((label_list, np.expand_dims(
+		path_label_dict[test_data[j+1]], 
+		axis = -1)), axis = -1)
+Ybatch = np.reshape(label_list, [batch_size, config.n_classes])
+
+Xbatch = data_loader.queue_data_dict(
+	test_data[:batch_size], im_size, config.lable_processed)
+	
 accuracy_ = sess.run(accuracy, feed_dict = {X: Xbatch, Y: Ybatch})
 print('Accuracy:', accuracy_)
 
