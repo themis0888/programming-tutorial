@@ -55,8 +55,9 @@ logits = tf.layers.dense(inputs=feat_layer2, units=config.n_classes, activation=
 # -------------------- Objective -------------------- #
 
 cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=Y), name='Loss')
-optimizer = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost)
-
+total_var = tf.global_variables() 
+optimizer_1 = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost)#, var_list= [v for v in total_var if not v in var_to_restore])
+optimizer_2 = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost, var_list= [v for v in total_var if not v in var_to_restore])
 #is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
 accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(logits)) - tf.round(Y)))
 # accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
@@ -94,6 +95,7 @@ batch_size = config.batch_size
 
 # feat, x, y = sess.run([feat_layer,logits, Y], feed_dict = {X: Xbatch, Y: Ybatch})
 # _ = sess.run(optimizer, feed_dict = {X: Xbatch, Y: Ybatch})
+counter = 0
 for epoch in range(15):
 	for list_file in list_files:
 
@@ -131,9 +133,15 @@ for epoch in range(15):
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
 
 			# pdb.set_trace()
-			_, cost_val, acc, acc_ = sess.run([optimizer, cost, merged, accuracy], 
-				feed_dict={X: Xbatch, Y: Ybatch})
+			if counter < 200:
+				_, cost_val, acc, acc_ = sess.run([optimizer_1, cost, merged, accuracy], 
+					feed_dict={X: Xbatch, Y: Ybatch})
+			else:
+				_, cost_val, acc, acc_ = sess.run([optimizer_2, cost, merged, accuracy], 
+					feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
+
+			counter += batch_size
 
 			if np.mod(i, 10) == 0:
 				print('Step:', '%05dk' % (int(i*batch_size/1000)),
@@ -145,11 +153,11 @@ for epoch in range(15):
 
 	writer.add_summary(acc, epoch)
 	# Save the model
-	if epoch % 5 == 0:
+	if np.mod(counter, 10000) == 0:
 		if not os.path.exists(config.checkpoint_path):
 			os.mkdir(config.checkpoint_path)
 		saver.save(sess, os.path.join(config.checkpoint_path, 
-			'fc_network_{0:03d}'.format(epoch)))
+			'vgg19_{0:03d}k'.format(counter/1000)))
 	
 
 # -------------------- Testing -------------------- #
