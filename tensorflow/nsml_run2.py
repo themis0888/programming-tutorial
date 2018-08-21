@@ -13,11 +13,16 @@ from tfskeleton.ns import bind_model
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default=os.path.join(DATASET_PATH, 'train'))
 parser.add_argument('--list_path', type=str, dest='list_path', default='.')
+parser.add_argument('--model_path', type=str, dest='model_path', default=os.path.join(DATASET_PATH, 'train'))
+
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=34)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=20)
 parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
 parser.add_argument('--lable_processed', type=bool, dest='lable_processed', default=True)
+parser.add_argument('--save_freq', type=int, dest='save_freq', default=1000)
 
+parser.add_argument('--epoch', type=int, dest='epoch', default=1000)
+parser.add_argument('--load_checkpoint', type=bool, dest='load_checkpoint', default=False)
 parser.add_argument('--checkpoint_path', type=str, dest='checkpoint_path', default='./checkpoints')
 parser.add_argument('--nsml', type=bool, dest='nsml', default=False)
 config, unparsed = parser.parse_known_args() 
@@ -50,9 +55,9 @@ with slim.arg_scope(vgg.vgg_arg_scope()):
 	all_vars = tf.all_variables()
 	var_to_restore = [v for v in all_vars]
 
-feat_layer2 = tf.reshape(feat_layer, [-1, 4096])
+feat_layer = tf.reshape(feat_layer, [-1, 4096])
 # Output logits Layer
-logits = tf.layers.dense(inputs=feat_layer2, units=config.n_classes, activation=None)
+logits = tf.layers.dense(inputs=feat_layer, units=config.n_classes, activation=None)
 
 
 # -------------------- Objective -------------------- #
@@ -73,14 +78,23 @@ init = tf.global_variables_initializer()
 sess.run(init)
 
 tf.train.start_queue_runners(sess=sess)
-saver = tf.train.Saver(var_to_restore)
-saver.restore(sess, "/shared/data/models/vgg_19.ckpt")
-saver = tf.train.Saver()
 
+if config.load_checkpoint:
+	saver = tf.train.import_meta_graph(os.path.join(
+		config.checkpoint_path, 'fc_network_000.meta'))
+	saver.restore(sess, tf.train.latest_checkpoint(config.checkpoint_path))
+
+	# saver = tf.train.Saver(total_var)
+	# saver.restore(sess, os.path.join(config.checkpoint_path))
+	print('Trained model Load Success')
+else:
+	saver = tf.train.Saver(var_to_restore)
+	saver.restore(sess, os.path.join(config.model_path, 'vgg_19.ckpt'))
+	print('VGG_19 pretrained model Loaded')
 
 # -------------------- Data maniging -------------------- #
 
-label_file = np.load(os.path.join('/shared/data/celeb_cartoon/','attributes.npz'))
+label_file = np.load(os.path.join(config.data_path,'attributes.npz'))
 
 data_loader.make_dict_file(config.data_path, config.list_path, 
 	label_file['attributes'], ('.png', '.jpg'), False, 1)
@@ -94,12 +108,9 @@ batch_size = config.batch_size
 # label_list = ['cat', 'dog']
 
 
-# -------------------- Training -------------------- #
-
-# feat, x, y = sess.run([feat_layer,logits, Y], feed_dict = {X: Xbatch, Y: Ybatch})
-# _ = sess.run(optimizer, feed_dict = {X: Xbatch, Y: Ybatch})
+# -------------------- Learning -------------------- #
 counter = 0
-for epoch in range(15):
+for epoch in range(config.epoch):
 	for list_file in list_files:
 
 		f = np.load(list_file)
@@ -134,8 +145,7 @@ for epoch in range(15):
 
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
-
-			# pdb.set_trace()
+	
 			if counter < 200:
 				_, cost_val, acc, acc_ = sess.run([optimizer_1, cost, merged, accuracy], 
 					feed_dict={X: Xbatch, Y: Ybatch})
@@ -144,24 +154,22 @@ for epoch in range(15):
 					feed_dict={X: Xbatch, Y: Ybatch})
 			total_cost += cost_val
 
-			counter += batch_size
+			counter += 1
 
-			if np.mod(i, 10) == 0:
-				print('Step:', '%05dk' % (int(i*batch_size/1000)),
+			if np.mod(counter, 10) == 0:
+				print('Step:', '%05dk' % (counter),
 					'\tAvg. cost =', '{:.5f}'.format(cost_val),
 					'\tAcc: {:.5f}'.format(acc_))
-			if config.nsml:
-				if np.mod(i, 200) == 0:
-					nsml.save(i)
 
-	writer.add_summary(acc, epoch)
+	writer.add_summary(acc, counter)
 	# Save the model
-	if np.mod(counter, 10000) == 0:
+	if np.mod(counter, config.save_freq) == 0:
+		if config.nsml:
+			nsml.save(counter)
 		if not os.path.exists(config.checkpoint_path):
 			os.mkdir(config.checkpoint_path)
 		saver.save(sess, os.path.join(config.checkpoint_path, 
 			'vgg19_{0:03d}k'.format(counter/1000)))
-
 
 # -------------------- Testing -------------------- #
 
