@@ -20,6 +20,7 @@ parser.add_argument('--batch_size', type=int, dest='batch_size', default=20)
 parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
 parser.add_argument('--lable_processed', type=bool, dest='lable_processed', default=True)
 parser.add_argument('--save_freq', type=int, dest='save_freq', default=1000)
+parser.add_argument('--print_freq', type=int, dest='print_freq', default=10)
 
 parser.add_argument('--epoch', type=int, dest='epoch', default=1000)
 parser.add_argument('--load_checkpoint', type=bool, dest='load_checkpoint', default=False)
@@ -156,20 +157,20 @@ for epoch in range(config.epoch):
 
 			counter += 1
 
-			if np.mod(counter, 10) == 0:
+			if np.mod(counter, config.print_freq) == 0:
 				print('Step:', '%05dk' % (counter),
 					'\tAvg. cost =', '{:.5f}'.format(cost_val),
 					'\tAcc: {:.5f}'.format(acc_))
+				writer.add_summary(acc, counter)
 
-	writer.add_summary(acc, counter)
-	# Save the model
-	if np.mod(counter, config.save_freq) == 0:
-		if config.nsml:
-			nsml.save(counter)
-		if not os.path.exists(config.checkpoint_path):
-			os.mkdir(config.checkpoint_path)
-		saver.save(sess, os.path.join(config.checkpoint_path, 
-			'vgg19_{0:03d}k'.format(counter/1000)))
+			# Save the model
+			if np.mod(counter, config.save_freq) == 0:
+				if config.nsml:
+					nsml.save(counter)
+				if not os.path.exists(config.checkpoint_path):
+					os.mkdir(config.checkpoint_path)
+				saver.save(sess, os.path.join(config.checkpoint_path, 
+					'vgg19_{0:03d}k'.format(int(counter/1000))))
 
 # -------------------- Testing -------------------- #
 
