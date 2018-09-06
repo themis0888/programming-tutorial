@@ -1,13 +1,12 @@
 """
-CUDA_VISIBLE_DEVICES=0 python -i classifier.py \
---data_path=/shared/data/mnist_png
+CUDA_VISIBLE_DEVICES=0 python -i classifier.py 
 """
 import tensorflow as tf
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', type=str, dest='data_path', default='/shared/data/mnist_png/')
-parser.add_argument('--list_path', type=str, dest='list_path', default='/shared/data/mnist_png/meta/')
+parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/input_data/mnist_png/')
+parser.add_argument('--meta_path', type=str, dest='meta_path', default='/home/siit/navi/data/meta_data/mnist_png/')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
 
@@ -40,7 +39,7 @@ logits = tf.layers.dense(inputs= fc, units=10)
 
 # -------------------- Objective -------------------- #
 
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=Y))
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y))
 optimizer = tf.train.AdamOptimizer(0.001).minimize(cost)
 
 is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
@@ -56,9 +55,9 @@ merged = tf.summary.merge_all()
 # -------------------- Data maniging -------------------- #
 
 
-data_loader.make_list_file(config.data_path, config.list_path, ('.png', '.jpg'), True, 1)
+data_loader.make_list_file(config.data_path, config.meta_path, ('.png', '.jpg'), True, 1)
 list_files = [os.path.join(dp, f)
-		for dp, dn, filenames in os.walk(config.list_path) 
+		for dp, dn, filenames in os.walk(config.meta_path) 
 		for f in filenames if 'path_label_list' in f]
 list_files.sort()
 
