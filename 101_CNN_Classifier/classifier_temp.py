@@ -36,8 +36,6 @@ import pdb
 
 # -------------------- Model -------------------- #
 
-slim = tf.contrib.slim
-vgg = nets.vgg
 
 height = 28
 width = 28
@@ -60,7 +58,7 @@ logits = tf.layers.dense(inputs= fc, units=10)
 
 # -------------------- Objective -------------------- #
 
-cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits, labels=Y), name='Loss')
+cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y), name='Loss')
 total_var = tf.global_variables() 
 optimizer_1 = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost)
 #is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
@@ -73,6 +71,7 @@ merged = tf.summary.merge_all()
 
 init = tf.global_variables_initializer()
 sess.run(init)
+saver = tf.train.Saver(total_var)
 
 tf.train.start_queue_runners(sess=sess)
 
@@ -82,8 +81,6 @@ tf.train.start_queue_runners(sess=sess)
 #label_file = np.load(os.path.join('/shared/data/celeb_cartoon/','attributes.npz'))
 label_file = np.load(os.path.join(config.meta_path, 'path_label_dict.npy'))
 
-data_loader.make_dict_file(config.data_path, config.meta_path, 
-	label_file['attributes'], ('.png', '.jpg'), False, 1)
 list_files = [os.path.join(dp, f)
 		for dp, dn, filenames in os.walk(config.meta_path) 
 		for f in filenames if 'dict.npy' in f]
@@ -127,20 +124,17 @@ for epoch in range(config.epoch):
 			label_list = np.expand_dims(path_label_dict[train_data[i*batch_size]], axis = -1)
 			for j in range(1, batch_size):
 				label_list = np.concatenate((label_list, np.expand_dims(
-					path_label_dict[train_data[i*batch_size + j+1]], 
+					path_label_dict[train_data[i*batch_size + j]], 
 					axis = -1)), axis = -1)
 			Ybatch = np.reshape(label_list, [batch_size, config.n_classes])
 
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
 
-			# pdb.set_trace()
-			if counter < 200:
-				_, cost_val, acc, acc_ = sess.run([optimizer_1, cost, merged, accuracy], 
-					feed_dict={X: Xbatch, Y: Ybatch})
-			else:
-				_, cost_val, acc, acc_ = sess.run([optimizer_2, cost, merged, accuracy], 
-					feed_dict={X: Xbatch, Y: Ybatch})
+
+			_, cost_val, acc, acc_ = sess.run([optimizer_1, cost, merged, accuracy], 
+				feed_dict={X: Xbatch, Y: Ybatch})
+		
 			total_cost += cost_val
 
 			counter += 1
