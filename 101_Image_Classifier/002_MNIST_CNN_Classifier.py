@@ -30,13 +30,14 @@ sess = tf.InteractiveSession(config=tf.ConfigProto(gpu_options=gpu_options))
 import os, random
 import data_loader
 import numpy as np
-import tensorflow.contrib.slim.nets as nets
 import pdb
 
 
 # -------------------- Model -------------------- #
 
-
+depth = 3
+window_1 = 3
+window_2 = 3
 height = 28
 width = 28
 channels = 3
@@ -45,7 +46,7 @@ im_size = [height, width, channels]
 X = tf.placeholder(tf.float32, [None, 28, 28, 3])
 Y = tf.placeholder(tf.float32, [None, 10])
 
-input_layer = tf.reshape(X, [-1, 28*28*3])
+input_layer = tf.reshape(X, [-1, 28, 28, 3])
 
 # Convolutional Layer #1
 conv = tf.layers.conv2d(inputs=input_layer, filters=32,
@@ -69,13 +70,12 @@ conv = tf.layers.conv2d(inputs=conv, filters=32,
 pool = tf.layers.max_pooling2d(inputs=conv, pool_size=[2, 2], strides=2)
 
 # Dense Layer
-pool2_flat = tf.reshape(pool, [-1, 7 * 7 * 64])
+pool2_flat = tf.reshape(pool, [-1, 7 * 7 * 32])
 dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
-dropout = tf.layers.dropout(
-	inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
+#dropout = tf.layers.dropout(inputs=dense, rate=0.4)
 
 # Logits Layer
-logits = tf.layers.dense(inputs=dropout, units=10)
+logits = tf.layers.dense(inputs=dense, units=10)
 
 
 # -------------------- Objective -------------------- #
@@ -84,7 +84,9 @@ cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, lab
 total_var = tf.global_variables() 
 optimizer_1 = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost)
 #is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
-accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(logits)) - tf.round(Y)))
+
+#accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(logits)) - tf.round(Y)))
+accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(logits) - tf.round(Y)))
 # accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
 writer = tf.summary.FileWriter("./board/sample", sess.graph)
@@ -153,10 +155,9 @@ for epoch in range(config.epoch):
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
 
+			_, cost_val, acc, acc_ = sess.run([optimizer_1, cost, merged, accuracy], feed_dict={X: Xbatch, Y: Ybatch})
+			
 
-			_, cost_val, acc, acc_ = sess.run([optimizer_1, cost, merged, accuracy], 
-				feed_dict={X: Xbatch, Y: Ybatch})
-		
 			total_cost += cost_val
 
 			counter += 1
