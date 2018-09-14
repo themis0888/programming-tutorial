@@ -83,14 +83,14 @@ logits = tf.layers.dense(inputs=dense, units=10)
 cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y), name='Loss')
 total_var = tf.global_variables() 
 optimizer_1 = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost)
-#is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
+is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
 
 #accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(logits)) - tf.round(Y)))
-accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(logits) - tf.round(Y)))
-# accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+# accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(logits) - tf.round(Y)))
+accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
 
 writer = tf.summary.FileWriter("./board/sample", sess.graph)
-acc_hist = tf.summary.scalar("Training accuracy", accuracy)
+acc_hist = tf.summary.scalar("Training_accuracy", accuracy)
 merged = tf.summary.merge_all()
 
 init = tf.global_variables_initializer()
@@ -145,11 +145,11 @@ for epoch in range(config.epoch):
 
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
-			label_list = np.expand_dims(path_label_dict[train_data[i*batch_size]], axis = -1)
+			label_list = np.expand_dims(path_label_dict[train_data[i*batch_size]], axis = 0)
 			for j in range(1, batch_size):
 				label_list = np.concatenate((label_list, np.expand_dims(
 					path_label_dict[train_data[i*batch_size + j]], 
-					axis = -1)), axis = -1)
+					axis = 0)), axis = 0)
 			Ybatch = np.reshape(label_list, [batch_size, config.n_classes])
 
 			Xbatch = data_loader.queue_data_dict(

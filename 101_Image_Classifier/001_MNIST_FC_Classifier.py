@@ -121,11 +121,11 @@ for epoch in range(config.epoch):
 
 		for i in range(total_batch):
 			# Get the batch as [batch_size, 28,28] and [batch_size, n_classes] ndarray
-			label_list = np.expand_dims(path_label_dict[train_data[i*batch_size]], axis = -1)
+			label_list = np.expand_dims(path_label_dict[train_data[i*batch_size]], axis = 0)
 			for j in range(1, batch_size):
 				label_list = np.concatenate((label_list, np.expand_dims(
 					path_label_dict[train_data[i*batch_size + j]], 
-					axis = -1)), axis = -1)
+					axis = 0)), axis = 0)
 			Ybatch = np.reshape(label_list, [batch_size, config.n_classes])
 
 			Xbatch = data_loader.queue_data_dict(
