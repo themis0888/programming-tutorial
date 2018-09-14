@@ -1,6 +1,9 @@
 """
 CUDA_VISIBLE_DEVICES=0 python -i 101_Training.py \
---lable_processed True \
+--data_path=/home/siit/navi/data/input_data/image_translation_dataset/cat2dog/ \
+--meta_path=/home/siit/navi/data/meta_data/image_translation_dataset/cat2dog/ \
+--n_classes=2 --im_size=224 --batch_size=10 \
+--label_processed True \
 
 """
 import tensorflow as tf
@@ -13,11 +16,13 @@ parser.add_argument('--model_path', type=str, dest='model_path', default='/share
 parser.add_argument('--epoch', type=int, dest='epoch', default=1000)
 
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=10)
+parser.add_argument('--im_size', type=int, dest='im_size', default=28)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=100)
-parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
-parser.add_argument('--lable_processed', type=bool, dest='lable_processed', default=True)
+
+parser.add_argument('--label_processed', type=bool, dest='label_processed', default=True)
 parser.add_argument('--save_freq', type=int, dest='save_freq', default=1000)
 parser.add_argument('--print_freq', type=int, dest='print_freq', default=50)
+parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
 
 parser.add_argument('--mode', type=str, dest='mode', default='pretrained')
 parser.add_argument('--load_checkpoint', type=bool, dest='load_checkpoint', default=False)
@@ -36,8 +41,8 @@ import pdb
 # -------------------- Model -------------------- #
 depth = 3
 window = 3
-height = 28
-width = 28
+height = config.im_size
+width = config.im_size
 channels = 3
 im_size = [height, width, channels]
 model = __import__('201_CNN_model').CNN_model(sess, config, 'CNN_model')
@@ -96,9 +101,9 @@ for epoch in range(config.epoch):
 			Ybatch = np.reshape(label_list, [batch_size, config.n_classes])
 
 			Xbatch = data_loader.queue_data_dict(
-				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
+				train_data[i*batch_size:(i+1)*batch_size], im_size, config.label_processed)
 
-			_, cost_val, acc, acc_ = model.train(Xbatch, Ybatch)
+			_, cost_val, acc, acc_ = model.sess.run([model.optimizer, model.cost, model.merged, model.accuracy], feed_dict={model.X: Xbatch, model.Y: Ybatch, model.training: True})
 
 			total_cost += cost_val
 

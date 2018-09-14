@@ -11,53 +11,57 @@ import numpy as np
 import pdb
 
 
-
+# -------------------- Model -------------------- #
 class CNN_model():
 	def __init__(self, sess, config, name):
 		self.sess = sess
 		self.name = name
-		self._build_net(config)
+		self._build_net()
 		self.training = tf.placeholder(tf.bool)
 
-	def _build_net(self, config):		
+	def _build_net(self):		
+		depth = 3
+		window = 3
+		height = 28
+		width = 28
+		channels = 3
+		filt = [32, 64]
+		im_size = [height, width, channels]
 
-		self.window = 3
-		self.height = config.im_size
-		self.width = config.im_size
-		self.channels = 3
-		self.n_classes = config.n_classes
-		self.filt = [32, 64, 128, 256, 256]
-		self.im_size = [self.height, self.width, self.channels]
+		self.X = tf.placeholder(tf.float32, [None, 28, 28, 3])
+		self.Y = tf.placeholder(tf.float32, [None, 10])
 
-		self.X = tf.placeholder(tf.float32, [None, self.height, self.width, self.channels])
-		self.Y = tf.placeholder(tf.float32, [None, self.n_classes])
+		self.input_layer = tf.reshape(self.X, [-1, 28, 28, 3])
 
-		# -------------------- Model -------------------- #
-		self.input_layer = tf.reshape(self.X, [-1, self.height, self.width, self.channels])
+		# Convolutional Layer #1
 		self.conv = self.input_layer
+		for i in range(3):
+			self.conv = tf.layers.conv2d(inputs=self.conv, filters=filt[0],
+				kernel_size=[window, window], padding="same", activation=tf.nn.relu)
 
-		for n_block in range(5):
-			# Convolutional Layer
-			for n_layer in range(3):
-				self.conv = tf.layers.conv2d(inputs=self.conv, filters=self.filt[n_block],
-					kernel_size=[self.window, self.window], padding="same", activation=tf.nn.relu)
+		# Pooling Layer #1
+		self.pool = tf.layers.max_pooling2d(inputs=self.conv, pool_size=[2, 2], strides=2)
 
-			# Pooling Layer
-			self.conv = tf.layers.max_pooling2d(inputs=self.conv, pool_size=[2, 2], strides=2)
+		# Convolutional Layer #2 and Pooling Layer #2
+		for i in range(3):
+			self.conv = tf.layers.conv2d(inputs=self.pool, filters=filt[1],
+				kernel_size=[window, window], padding="same", activation=tf.nn.relu)
+
+		# Pooling Layer #2
+		self.pool = tf.layers.max_pooling2d(inputs=self.conv, pool_size=[2, 2], strides=2)
 
 		# Dense Layer
-		self.pool_flat = tf.reshape(self.conv, [-1, int(self.height * self.width / (2**5)**2) * self.filt[-1]])
-		self.dense = tf.layers.dense(inputs=self.pool_flat, units=512, activation=tf.nn.relu)
+		self.pool2_flat = tf.reshape(self.pool, [-1, 7 * 7 * filt[1]])
+		self.dense = tf.layers.dense(inputs=self.pool2_flat, units=1024, activation=tf.nn.relu)
 		#dropout = tf.layers.dropout(inputs=dense, rate=0.4)
 
 		# Logits Layer
-		self.logits = tf.layers.dense(inputs=self.dense, units=self.n_classes)
-		#pdb.set_trace()
+		self.logits = tf.layers.dense(inputs=self.dense, units=10)
+
 
 		# -------------------- Objective -------------------- #
 
-		self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(
-			logits=self.logits, labels=self.Y), name='Loss')
+		self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.Y), name='Loss')
 		total_var = tf.global_variables() 
 		self.optimizer = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(self.cost)
 		self.is_correct = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.Y, 1))
