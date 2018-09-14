@@ -38,8 +38,8 @@ import pdb
 depth = 3
 window_1 = 3
 window_2 = 3
-height = 28
-width = 28
+height = 224
+width = 224
 channels = 3
 im_size = [height, width, channels]
 
@@ -49,30 +49,48 @@ Y = tf.placeholder(tf.float32, [None, 10])
 input_layer = tf.reshape(X, [-1, 28, 28, 3])
 
 # Convolutional Layer #1
-conv = tf.layers.conv2d(inputs=input_layer, filters=32,
-	kernel_size=[window_1, window_1], padding="same", activation=tf.nn.relu)
-conv = tf.layers.conv2d(inputs=conv, filters=32,
-	kernel_size=[window_1, window_1], padding="same", activation=tf.nn.relu)
-conv = tf.layers.conv2d(inputs=conv, filters=32,
-	kernel_size=[window_1, window_1], padding="same", activation=tf.nn.relu)
+self.conv1_1 = self.conv_layer(bgr, 3, 64, "conv1_1")
+self.conv1_2 = self.conv_layer(self.conv1_1, 64, 64, "conv1_2")
+self.pool1 = self.max_pool(self.conv1_2, 'pool1')
 
-# Pooling Layer #1
-pool = tf.layers.max_pooling2d(inputs=conv, pool_size=[2, 2], strides=2)
+self.conv2_1 = self.conv_layer(self.pool1, 64, 128, "conv2_1")
+self.conv2_2 = self.conv_layer(self.conv2_1, 128, 128, "conv2_2")
+self.pool2 = self.max_pool(self.conv2_2, 'pool2')
 
-# Convolutional Layer #2 and Pooling Layer #2
-conv = tf.layers.conv2d(inputs=pool, filters=32,
-	kernel_size=[window_1, window_1], padding="same", activation=tf.nn.relu)
-conv = tf.layers.conv2d(inputs=conv, filters=32,
-	kernel_size=[window_1, window_1], padding="same", activation=tf.nn.relu)
-conv = tf.layers.conv2d(inputs=conv, filters=32,
-	kernel_size=[window_1, window_1], padding="same", activation=tf.nn.relu)
+self.conv3_1 = self.conv_layer(self.pool2, 128, 256, "conv3_1")
+self.conv3_2 = self.conv_layer(self.conv3_1, 256, 256, "conv3_2")
+self.conv3_3 = self.conv_layer(self.conv3_2, 256, 256, "conv3_3")
+self.conv3_4 = self.conv_layer(self.conv3_3, 256, 256, "conv3_4")
+self.pool3 = self.max_pool(self.conv3_4, 'pool3')
 
-pool = tf.layers.max_pooling2d(inputs=conv, pool_size=[2, 2], strides=2)
+self.conv4_1 = self.conv_layer(self.pool3, 256, 512, "conv4_1")
+self.conv4_2 = self.conv_layer(self.conv4_1, 512, 512, "conv4_2")
+self.conv4_3 = self.conv_layer(self.conv4_2, 512, 512, "conv4_3")
+self.conv4_4 = self.conv_layer(self.conv4_3, 512, 512, "conv4_4")
+self.pool4 = self.max_pool(self.conv4_4, 'pool4')
 
-# Dense Layer
-pool2_flat = tf.reshape(pool, [-1, 7 * 7 * 32])
-dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
-#dropout = tf.layers.dropout(inputs=dense, rate=0.4)
+self.conv5_1 = self.conv_layer(self.pool4, 512, 512, "conv5_1")
+self.conv5_2 = self.conv_layer(self.conv5_1, 512, 512, "conv5_2")
+self.conv5_3 = self.conv_layer(self.conv5_2, 512, 512, "conv5_3")
+self.conv5_4 = self.conv_layer(self.conv5_3, 512, 512, "conv5_4")
+self.pool5 = self.max_pool(self.conv5_4, 'pool5')
+
+self.fc6 = self.fc_layer(self.pool5, 25088, 4096, "fc6")  # 25088 = ((224 // (2 ** 5)) ** 2) * 512
+self.relu6 = tf.nn.relu(self.fc6)
+
+if train_mode is not None:
+	self.relu6 = tf.cond(train_mode, lambda: tf.nn.dropout(self.relu6, self.dropout), lambda: self.relu6)
+elif self.trainable:
+	self.relu6 = tf.nn.dropout(self.relu6, self.dropout)
+
+self.fc7 = self.fc_layer(self.relu6, 4096, 4096, "fc7")
+self.relu7 = tf.nn.relu(self.fc7)
+if train_mode is not None:
+	self.relu7 = tf.cond(train_mode, lambda: tf.nn.dropout(self.relu7, self.dropout), lambda: self.relu7)
+elif self.trainable:
+	self.relu7 = tf.nn.dropout(self.relu7, self.dropout)
+
+self.fc8 = self.fc_layer(self.relu7, 4096, 1000, "fc8")
 
 # Logits Layer
 logits = tf.layers.dense(inputs=dense, units=10)

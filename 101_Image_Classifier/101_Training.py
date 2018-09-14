@@ -1,5 +1,5 @@
 """
-CUDA_VISIBLE_DEVICES=0 python -i 001_MNIST_FC_Classifier.py \
+CUDA_VISIBLE_DEVICES=0 python -i 101_Training.py \
 --lable_processed True \
 
 """
@@ -39,59 +39,8 @@ window = 3
 height = 28
 width = 28
 channels = 3
-filt = [32, 64]
 im_size = [height, width, channels]
-
-X = tf.placeholder(tf.float32, [None, 28, 28, 3])
-Y = tf.placeholder(tf.float32, [None, 10])
-
-input_layer = tf.reshape(X, [-1, 28, 28, 3])
-
-# Convolutional Layer #1
-conv = input_layer
-for i in range(3):
-	conv = tf.layers.conv2d(inputs=conv, filters=filt[0],
-		kernel_size=[window, window], padding="same", activation=tf.nn.relu)
-
-# Pooling Layer #1
-pool = tf.layers.max_pooling2d(inputs=conv, pool_size=[2, 2], strides=2)
-
-# Convolutional Layer #2 and Pooling Layer #2
-for i in range(3):
-	conv = tf.layers.conv2d(inputs=pool, filters=filt[1],
-		kernel_size=[window, window], padding="same", activation=tf.nn.relu)
-
-# Pooling Layer #2
-pool = tf.layers.max_pooling2d(inputs=conv, pool_size=[2, 2], strides=2)
-
-# Dense Layer
-pool2_flat = tf.reshape(pool, [-1, 7 * 7 * filt[1]])
-dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
-#dropout = tf.layers.dropout(inputs=dense, rate=0.4)
-
-# Logits Layer
-logits = tf.layers.dense(inputs=dense, units=10)
-
-# -------------------- Objective -------------------- #
-
-cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=Y), name='Loss')
-total_var = tf.global_variables() 
-optimizer_1 = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(cost)
-is_correct = tf.equal(tf.argmax(logits, 1), tf.argmax(Y, 1))
-
-#accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(logits)) - tf.round(Y)))
-# accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(logits) - tf.round(Y)))
-accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
-
-writer = tf.summary.FileWriter("./board/sample", sess.graph)
-acc_hist = tf.summary.scalar("Training_accuracy", accuracy)
-merged = tf.summary.merge_all()
-
-init = tf.global_variables_initializer()
-sess.run(init)
-saver = tf.train.Saver(total_var)
-
-tf.train.start_queue_runners(sess=sess)
+model = __import__('201_CNN_model').CNN_model(sess, config, 'CNN_model')
 
 
 # -------------------- Data maniging -------------------- #
@@ -149,8 +98,7 @@ for epoch in range(config.epoch):
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.lable_processed)
 
-			_, cost_val, acc, acc_ = sess.run([optimizer_1, cost, merged, accuracy], feed_dict={X: Xbatch, Y: Ybatch})
-			
+			_, cost_val, acc, acc_ = model.train(Xbatch, Ybatch)
 
 			total_cost += cost_val
 
@@ -160,13 +108,13 @@ for epoch in range(config.epoch):
 				print('Step:', '%05dk' % (counter),
 					'\tAvg. cost =', '{:.5f}'.format(cost_val),
 					'\tAcc: {:.5f}'.format(acc_))
-				writer.add_summary(acc, counter)
+				model.writer.add_summary(acc, counter)
 
 			# Save the model
 			if np.mod(counter, config.save_freq) == 0:
 				if not os.path.exists(config.checkpoint_path):
 					os.mkdir(config.checkpoint_path)
-				saver.save(sess, os.path.join(config.checkpoint_path, 
+				model.saver.save(sess, os.path.join(config.checkpoint_path, 
 					'vgg19_{0:03d}k'.format(int(counter/1000))))
 				print('Model ')
 	
