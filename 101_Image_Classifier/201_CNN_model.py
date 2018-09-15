@@ -26,6 +26,7 @@ class CNN_model():
 		self.width = config.im_size
 		self.channels = 3
 		self.n_classes = config.n_classes
+		self.num_block = int(np.log(config.im_size/7)/np.log(2))
 		self.filt = [32, 64, 128, 256, 256]
 		self.im_size = [self.height, self.width, self.channels]
 
@@ -36,7 +37,7 @@ class CNN_model():
 		self.input_layer = tf.reshape(self.X, [-1, self.height, self.width, self.channels])
 		self.conv = self.input_layer
 
-		for n_block in range(5):
+		for n_block in range(self.num_block):
 			# Convolutional Layer
 			for n_layer in range(3):
 				self.conv = tf.layers.conv2d(inputs=self.conv, filters=self.filt[n_block],
@@ -46,7 +47,7 @@ class CNN_model():
 			self.conv = tf.layers.max_pooling2d(inputs=self.conv, pool_size=[2, 2], strides=2)
 
 		# Dense Layer
-		self.pool_flat = tf.reshape(self.conv, [-1, int(self.height * self.width / (2**5)**2) * self.filt[-1]])
+		self.pool_flat = tf.reshape(self.conv, [-1, int(self.height * self.width / (2**self.num_block)**2) * self.filt[self.num_block-1]])
 		self.dense = tf.layers.dense(inputs=self.pool_flat, units=512, activation=tf.nn.relu)
 		#dropout = tf.layers.dropout(inputs=dense, rate=0.4)
 
@@ -62,7 +63,7 @@ class CNN_model():
 		self.optimizer = tf.train.AdamOptimizer(0.001, epsilon=0.01).minimize(self.cost)
 		self.is_correct = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.Y, 1))
 
-		#accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(self.logits)) - tf.round(Y)))
+		# accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(tf.nn.sigmoid(self.logits)) - tf.round(Y)))
 		# accuracy = 1 - tf.reduce_mean(tf.abs(tf.round(self.logits) - tf.round(Y)))
 		self.accuracy = tf.reduce_mean(tf.cast(self.is_correct, tf.float32))
 
