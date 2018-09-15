@@ -45,8 +45,9 @@ height = config.im_size
 width = config.im_size
 channels = 3
 im_size = [height, width, channels]
-model = __import__('201_CNN_model').CNN_model(sess, config, 'CNN_model')
 
+# model = __import__('201_CNN_model').CNN_model(sess, config, 'CNN_model')
+model = __import__('202_VGG_model').Vgg19(sess, config, 'VGG_19')
 
 # -------------------- Data maniging -------------------- #
 
@@ -63,8 +64,8 @@ batch_size = config.batch_size
 
 # -------------------- Training -------------------- #
 
-# feat, x, y = sess.run([feat_layer,logits, Y], feed_dict = {X: Xbatch, Y: Ybatch})
-# _ = sess.run(optimizer, feed_dict = {X: Xbatch, Y: Ybatch})
+# If you want to debug the model, write the following command on the console
+# log_ = model.sess.run([model.logits], feed_dict={model.X: Xbatch, model.Y: Ybatch, model.training: True})
 
 counter = 0
 for epoch in range(config.epoch):
@@ -103,7 +104,9 @@ for epoch in range(config.epoch):
 			Xbatch = data_loader.queue_data_dict(
 				train_data[i*batch_size:(i+1)*batch_size], im_size, config.label_processed)
 
-			_, cost_val, acc, acc_ = model.sess.run([model.optimizer, model.cost, model.merged, model.accuracy], feed_dict={model.X: Xbatch, model.Y: Ybatch, model.training: True})
+			_, cost_val, acc, acc_ = model.sess.run(
+				[model.optimizer, model.cost, model.merged, model.accuracy], 
+				feed_dict={model.X: Xbatch, model.Y: Ybatch, model.training: True})
 
 			total_cost += cost_val
 
