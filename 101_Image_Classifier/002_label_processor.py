@@ -1,7 +1,7 @@
 """
-python -i file_list_writer.py \
---data_path=/home/siit/navi/data/input_data/mnist_png/ \
---save_path=/home/siit/navi/data/meta_data/mnist_png/ \
+python -i label_processor.py \
+--data_path=/home/siit/navi/data/input_data/image_translation_dataset/cat2dog \
+--save_path=/home/siit/navi/data/meta_data/image_translation_dataset/cat2dog/ \
 --path_label False
 """
 
