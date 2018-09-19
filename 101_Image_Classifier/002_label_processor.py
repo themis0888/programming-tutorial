@@ -1,8 +1,8 @@
 """
-python -i label_processor.py \
+python -i 002_label_processor.py \
 --data_path=/home/siit/navi/data/input_data/image_translation_dataset/cat2dog \
 --save_path=/home/siit/navi/data/meta_data/image_translation_dataset/cat2dog/ \
---path_label False
+--path_label False 123
 """
 
 import os
@@ -40,17 +40,18 @@ if not os.path.exists(save_path):
 path_list = file_list(config.data_path, ('.jpg','.png'), True)
 lenth = len(path_list)
 
-# for mnist
-#label_list = list('0123456789')
 
-# for cat dog
-label_list = ['trainA', 'trainB']
+# label_list = list('0123456789') # for mnist
+# label_list = ['trainA', 'trainB'] # for cat dog
+label_list = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
 
 path_label_dict = {}
 
 counter = 0
 for line in path_list:
-    one_hot_label = np.eye(len(label_list))[label_list.index(line.split('/')[-2])]
+    one_hot_label = np.eye(len(label_list))[label_list.index(
+        os.path.basename(line).split('_')[1].split('.')[0])]
+    # one_hot_label = np.eye(len(label_list))[label_list.index(line.split('/')[-2])]
     one_hot_label = np.uint8(one_hot_label)
     path_label_dict[line] = one_hot_label
     counter += 1
