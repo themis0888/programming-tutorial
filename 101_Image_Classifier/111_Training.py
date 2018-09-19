@@ -1,8 +1,8 @@
 """
-CUDA_VISIBLE_DEVICES=0 python -i 101_Training.py \
---data_path=/home/siit/navi/data/input_data/image_translation_dataset/cat2dog/ \
---meta_path=/home/siit/navi/data/meta_data/image_translation_dataset/cat2dog/ \
---n_classes=2 --im_size=224 --batch_size=10 \
+CUDA_VISIBLE_DEVICES=0 python -i 111_Training.py \
+--data_path=/home/siit/navi/data/input_data/cifar/ \
+--meta_path=/home/siit/navi/data/meta_data/cifar/ \
+--n_classes=10 --im_size=224 --batch_size=10 \
 --label_processed True \
 
 """
