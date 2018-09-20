@@ -47,7 +47,8 @@ channels = 3
 im_size = [height, width, channels]
 
 # model = __import__('201_CNN_model').CNN_model(sess, config, 'CNN_model')
-model = __import__('202_VGG_model').Vgg19(sess, config, 'VGG_19')
+# model = __import__('202_VGG_model').Vgg19(sess, config, 'VGG_19')
+model = __import__('203_ResNet_model').ResNet(sess, config, 'ResNet')
 
 # -------------------- Data maniging -------------------- #
 
