@@ -4,7 +4,6 @@ CUDA_VISIBLE_DEVICES=0 python -i 101_Training.py \
 
 """
 import tensorflow as tf
-import argparse
 import os, random
 import data_loader
 import numpy as np
@@ -20,7 +19,7 @@ class CNN_model():
 		self.training = tf.placeholder(tf.bool)
 
 	def _build_net(self, config):		
-
+		
 		self.window = 3
 		self.height = config.im_size
 		self.width = config.im_size
