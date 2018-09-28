@@ -7,6 +7,7 @@ import os
 import numpy as np
 import skimage.io as skio
 import scipy.misc
+import pdb
 
 
 # extensions = ('.jpg', '.png')
@@ -114,7 +115,7 @@ def queue_data_dict(file_list, im_size = [28,28], label_processed = False, norm=
 	for i in range(batch_size):
 		impath = file_list[i]
 		# return the index of the label 
-
+		pdb.set_trace()
 		img = np.asarray(skio.imread(impath))
 		if img.ndim < 3:
 			img = np.expand_dims(img, axis = -1)
