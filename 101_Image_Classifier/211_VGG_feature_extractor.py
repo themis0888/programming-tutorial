@@ -25,12 +25,12 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/danbooru2017/256px/')
-parser.add_argument('--save_path', type=str, dest='save_path', default='/home/siit/navi/data/meta/danbooru2017/256px/')
+parser.add_argument('--save_path', type=str, dest='save_path', default='/.output')
 parser.add_argument('--input_list', type=str, dest='input_list', default='path_label_list.txt')
 parser.add_argument('--model_path', type=str, dest='model_path', default='/home/siit/navi/data/models/')
 parser.add_argument('--model_name', type=str, dest='model_name', default='vgg_19')
 
-parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.96)
+parser.add_argument('--memory_usage', type=float, dest='memory_usage', default=0.45)
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=50)
 parser.add_argument('--max_iter', type=int, dest='max_iter', default=300000)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=1)
@@ -108,9 +108,9 @@ example) queue_data('/home/siit/navi/data/sample/meta/path_label_list.txt',
 
 feat = []
 
-for i in range(num_file+1):
+for i in range(num_file):
 	batch_x = data_loader.queue_data_dict([list_files[i]], im_size)
-
+	batch_y = np.zeros([1,50])
 	feature = sess.run(feat_layer, feed_dict={x: batch_x, y_: batch_y, keep_prob:1.0})
 	feat.append(feature[0][0][0])
 
@@ -122,7 +122,8 @@ save_path = config.save_path
 if not os.path.exists(save_path):
 	os.mkdir(save_path)
 
-sio.savemat(save_path + config.model_name + '_feature_prediction{0:03d}.mat'.format(itr), 
+sio.savemat(os.path.join(save_path, 
+	config.model_name + '_feature_prediction.mat'), 
 	{'feature': feat})
 
 print('end')
