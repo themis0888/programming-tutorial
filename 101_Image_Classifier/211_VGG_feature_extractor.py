@@ -2,6 +2,7 @@
 CUDA_VISIBLE_DEVICES=0 \
 python -i 211_VGG_feature_extractor.py \
 --data_path=/home/siit/navi/data/input_data/ukbench_small/ \
+--save_path=/home/siit/navi/data/meta_data/ukbench_small/ \
 --model_name=vgg_19
 
 
@@ -25,7 +26,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/danbooru2017/256px/')
-parser.add_argument('--save_path', type=str, dest='save_path', default='/.output')
+parser.add_argument('--save_path', type=str, dest='save_path', default='./output')
 parser.add_argument('--input_list', type=str, dest='input_list', default='path_label_list.txt')
 parser.add_argument('--model_path', type=str, dest='model_path', default='/home/siit/navi/data/models/')
 parser.add_argument('--model_name', type=str, dest='model_name', default='vgg_19')
@@ -43,6 +44,10 @@ config, unparsed = parser.parse_known_args()
 gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=config.memory_usage)
 sess = tf.InteractiveSession(config=tf.ConfigProto(gpu_options=gpu_options))
 
+if os.path.exists(config.save_path):
+	os.makedirs(config.save_path)
+
+	
 """ TRAINING """
 im_size = [224, 224, 3]
 x = tf.placeholder(tf.float32, shape=[None, 224, 224, 3])
@@ -107,12 +112,13 @@ example) queue_data('/home/siit/navi/data/sample/meta/path_label_list.txt',
 """
 
 feat = []
-
+feat_dict = {}
 for i in range(num_file):
 	batch_x = data_loader.queue_data_dict([list_files[i]], im_size)
 	batch_y = np.zeros([1,50])
 	feature = sess.run(feat_layer, feed_dict={x: batch_x, y_: batch_y, keep_prob:1.0})
 	feat.append(feature[0][0][0])
+	feat_dict[list_files[i]] = feature[0][0][0]
 
 	if i%1000 == 0:
 		print("{0:5f} % done".format(100*i/num_file))
@@ -122,8 +128,8 @@ save_path = config.save_path
 if not os.path.exists(save_path):
 	os.mkdir(save_path)
 
-sio.savemat(os.path.join(save_path, 
-	config.model_name + '_feature_prediction.mat'), 
-	{'feature': feat})
+np.save(os.path.join(save_path, 
+	config.model_name + '_feature_prediction.npy'), feat_dict)
 
-print('end')
+
+print('Feature extraction completed')
