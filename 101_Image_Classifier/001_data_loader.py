@@ -1,6 +1,6 @@
 """
 CUDA_VISIBLE_DEVICES=0 python -i mnist_classification.py \
-#--data_path=/shared/data/mnist_png
+--data_path=/shared/data/mnist_png
 """
 import tensorflow as tf
 import os
