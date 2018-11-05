@@ -1,5 +1,5 @@
 """
-CUDA_VISIBLE_DEVICES=0 python -i mnist_classification.py \
+CUDA_VISIBLE_DEVICES=0 python -i 001_run.py \
 --data_path=/shared/data/mnist_png
 """
 import tensorflow as tf
