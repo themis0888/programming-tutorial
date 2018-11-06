@@ -1,0 +1,3 @@
+[submodule "pytorch/pytorch-tutorial"]
+	path = pytorch/pytorch-tutorial
+	url = https://github.com/themis0888/pytorch-tutorial.git
