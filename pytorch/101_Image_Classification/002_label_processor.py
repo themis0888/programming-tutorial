@@ -1,8 +1,8 @@
 """
 python -i 002_label_processor.py \
---data_path=/home/siit/navi/data/input_data/image_translation_dataset/cat2dog \
---save_path=/home/siit/navi/data/meta_data/image_translation_dataset/cat2dog/ \
---path_label False 123
+--data_path=/navi/data/input_data/CUB_200_2011/images \
+--save_path=. \
+--path_label False
 """
 
 import os
@@ -22,12 +22,10 @@ config, unparsed = parser.parse_known_args()
 
 
 def file_list(path, extensions, sort=True):
-
     result = [os.path.join(dp, f) for dp, dn, filenames in os.walk(path) 
     for f in filenames if os.path.splitext(f)[1] in extensions]
     if sort:
         result.sort() 
-
     return result
 
 
@@ -43,10 +41,21 @@ lenth = len(path_list)
 
 # label_list = list('0123456789') # for mnist
 # label_list = ['trainA', 'trainB'] # for cat dog
-label_list = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+# label_list = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+label_list = os.listdir(config.data_path)
+label_list.sort()
 
 path_label_dict = {}
 
+f = open('train.txt', 'w')
+for line in path_list:
+    label_index = label_list.index(line.split('/')[-2]) 
+
+    f.write('{} {}\n'.format(line, label_index))
+    
+f.close()
+
+"""
 counter = 0
 for line in path_list:
     one_hot_label = np.eye(len(label_list))[label_list.index(
@@ -55,9 +64,9 @@ for line in path_list:
     one_hot_label = np.uint8(one_hot_label)
     path_label_dict[line] = one_hot_label
     counter += 1
-    
-np.save(os.path.join(config.save_path, 'path_label_dict.npy'), path_label_dict)
 
+np.save(os.path.join(config.save_path, 'path_label_dict.npy'), path_label_dict)
+"""
 
 """
 for itr in range(config.iter):
