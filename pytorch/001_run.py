@@ -30,8 +30,9 @@ class Net(nn.Module):
 		x = x.view(-1, self.num_flat_feature(x))
 		x = F.relu(self.fc1(x))
 		x = F.relu(self.fc2(x))
+		middle = x
 		x = self.fc3(x)
-		return x
+		return x, middle
 	
 	def num_flat_feature(self, x):
 		size = x.size()[1:]

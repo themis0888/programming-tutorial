@@ -4,31 +4,6 @@ Transfer Learning Tutorial
 ==========================
 **Author**: `Sasank Chilamkurthy <https://chsasank.github.io>`_
 
-In this tutorial, you will learn how to train your network using
-transfer learning. You can read more about the transfer learning at `cs231n
-notes <http://cs231n.github.io/transfer-learning/>`__
-
-Quoting these notes,
-
-    In practice, very few people train an entire Convolutional Network
-    from scratch (with random initialization), because it is relatively
-    rare to have a dataset of sufficient size. Instead, it is common to
-    pretrain a ConvNet on a very large dataset (e.g. ImageNet, which
-    contains 1.2 million images with 1000 categories), and then use the
-    ConvNet either as an initialization or a fixed feature extractor for
-    the task of interest.
-
-These two major transfer learning scenarios look as follows:
-
--  **Finetuning the convnet**: Instead of random initializaion, we
-   initialize the network with a pretrained network, like the one that is
-   trained on imagenet 1000 dataset. Rest of the training looks as
-   usual.
--  **ConvNet as fixed feature extractor**: Here, we will freeze the weights
-   for all of the network except that of the final fully connected
-   layer. This last fully connected layer is replaced with a new one
-   with random weights and only this layer is trained.
-
 """
 # License: BSD
 # Author: Sasank Chilamkurthy
@@ -72,6 +47,31 @@ plt.ion()   # interactive mode
 
 # Data augmentation and normalization for training
 # Just normalization for validation
+
+
+class ImagesDataset(torch.utils.data.Dataset):
+    def __init__(self, df, transform=None,
+                 loader=tv.datasets.folder.default_loader):
+        self.df = df
+        self.transform = transform
+        self.loader = loader
+
+    def __getitem__(self, index):
+        row = self.df.iloc[index]
+
+        target = row['class_']
+        path = row['path']
+        img = self.loader(path)
+        if self.transform is not None:
+            img = self.transform(img)
+
+        return img, target
+
+    def __len__(self):
+        n, _ = self.df.shape
+        return n
+
+        
 data_transforms = transforms.Compose([
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
@@ -80,7 +80,7 @@ data_transforms = transforms.Compose([
     ])
 
 
-data_dir = '/navi/data/input_data/CUB_200_2011/images/'
+data_dir = '/home/siit/navi/data/input_data/CUB_200_2011/images/'
 image_datasets = datasets.ImageFolder(os.path.join(data_dir),
                                           data_transforms)
 dataloaders = torch.utils.data.DataLoader(image_datasets, batch_size=4,
