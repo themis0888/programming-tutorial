@@ -32,8 +32,19 @@ class Net(nn.Module):
 		x = F.relu(self.fc2(x))
 		middle = x
 		x = self.fc3(x)
-		return x, middle
-	
+		return x
+
+	def forward2(self, x):
+		x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
+		x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+		x = x.view(-1, self.num_flat_feature(x))
+		x = F.relu(self.fc1(x))
+		x = F.relu(self.fc2(x))
+		middle = x
+		x = self.fc3(x)
+		return middle
+
+
 	def num_flat_feature(self, x):
 		size = x.size()[1:]
 		num_features = 1

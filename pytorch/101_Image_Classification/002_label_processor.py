@@ -1,7 +1,7 @@
 """
 python -i 002_label_processor.py \
---data_path=/navi/data/input_data/CUB_200_2011/images \
---save_path=. \
+--data_path=/home/siit/navi/data/input_data/CUB_200_2011/images \
+--save_path=/home/siit/navi/data/input_data/CUB_200_2011/ \
 --path_label False
 """
 
@@ -47,7 +47,7 @@ label_list.sort()
 
 path_label_dict = {}
 
-f = open('train.txt', 'w')
+f = open(os.path.join(config.save_path, 'train.txt'), 'w')
 for line in path_list:
     label_index = label_list.index(line.split('/')[-2]) 
 
