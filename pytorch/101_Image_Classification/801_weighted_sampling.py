@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 CUDA_VISIBLE_DEVICES=0 python -i 003_transfer_learning_tutorial.py \
---data_path=/shared/data/mnist_png
+--weighted=True
 
 
 Transfer Learning Tutorial
@@ -27,33 +27,21 @@ import os
 import copy
 import pdb
 module = __import__('201_vgg')
+import argparse
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/input_data/mnist_png/')
+parser.add_argument('--data_name', type=str, dest='data_name', default='danbooru')
+parser.add_argument('--save_path', type=str, dest='save_path', default='/home/siit/navi/data/meta_data/mnist_png/')
+
+parser.add_argument('--n_classes', type=int, dest='n_classes', default=34)
+parser.add_argument('--path_label', type=bool, dest='path_label', default=False)
+parser.add_argument('--weighted', type=bool, dest='weighted', default=False)
+parser.add_argument('--iter', type=int, dest='iter', default=1)
+config, unparsed = parser.parse_known_args() 
 
 plt.ion()   # interactive mode
-
-######################################################################
-# Load Data
-# ---------
-#
-# We will use torchvision and torch.utils.data packages for loading the
-# data.
-#
-# The problem we're going to solve today is to train a model to classify
-# **ants** and **bees**. We have about 120 training images each for ants and bees.
-# There are 75 validation images for each class. Usually, this is a very
-# small dataset to generalize upon, if trained from scratch. Since we
-# are using transfer learning, we should be able to generalize reasonably
-# well.
-#
-# This dataset is a very small subset of imagenet.
-#
-# .. Note ::
-#    Download the data from
-#    `here <https://download.pytorch.org/tutorial/hymenoptera_data.zip>`_
-#    and extract it to the current directory.
-
-# Data augmentation and normalization for training
-# Just normalization for validation
-
 
 
 
@@ -133,10 +121,25 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             running_corrects = 0
 
             # Iterate over data.
-            step = 0
-            wrong_list = [0 for i in range(num_class)]
+            
+            total_wrong = 0
+            wrong_list = [1 for i in range(num_class)]
+            for ele in wrong_list: total_wrong += ele
+            
+            weights = [x / total_wrong for x in wrong_list]
+            
+            if config.weighted:
+                sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, len(weights))
+            else: 
+                sampler = torch.utils.data.sampler.RandomSampler(image_datasets)
+            
+            dataloaders = torch.utils.data.DataLoader(image_datasets, 
+                batch_size=batch_size, sampler = sampler)
+        
 
-            for inputs, labels in dataloaders:
+            for step in range(1000):
+
+                inputs, labels = next(iter(dataloaders))
                 step += 1
                 counter += 1
                 inputs = inputs.to(device)
