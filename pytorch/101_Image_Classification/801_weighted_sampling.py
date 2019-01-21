@@ -23,7 +23,7 @@ import torchvision
 from torchvision import datasets, models, transforms
 import matplotlib.pyplot as plt
 import time
-import os
+import os, datetime
 import copy
 import pdb
 module = __import__('201_vgg')
@@ -34,8 +34,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/input_data/mnist_png/')
 parser.add_argument('--data_name', type=str, dest='data_name', default='danbooru')
 parser.add_argument('--save_path', type=str, dest='save_path', default='/home/siit/navi/data/meta_data/mnist_png/')
+parser.add_argument('--checkpoint', type=str, dest='checkpoint', default='./checkpoint')
+parser.add_argument('--log_path', type=str, dest='log_path', default='./log')
 
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=34)
+parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
+parser.add_argument('--step_size', type=int, dest='step_size', default=500)
+parser.add_argument('--alpha', type=int, dest='alpha', default=30)
+parser.add_argument('--save_freq', type=int, dest='save_freq', default=5)
 parser.add_argument('--path_label', type=bool, dest='path_label', default=False)
 parser.add_argument('--weighted', type=bool, dest='weighted', default=False)
 parser.add_argument('--iter', type=int, dest='iter', default=1)
@@ -44,6 +50,8 @@ config, unparsed = parser.parse_known_args()
 plt.ion()   # interactive mode
 
 
+if not os.path.exists(config.checkpoint): os.makedirs(config.checkpoint)
+if not os.path.exists(config.log_path): os.makedirs(config.log_path)
 
 data_transforms = transforms.Compose([
         transforms.RandomResizedCrop(224),
@@ -52,7 +60,8 @@ data_transforms = transforms.Compose([
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-batch_size = 4
+batch_size = config.batch_size
+step_size = config.step_size
 data_dir = '/home/siit/navi/data/input_data/CUB_200_2011/images/'
 image_datasets = datasets.ImageFolder(os.path.join(data_dir),
                                           data_transforms)
@@ -62,6 +71,12 @@ dataloaders = torch.utils.data.DataLoader(image_datasets, batch_size=batch_size,
 dataset_sizes = len(image_datasets)
 class_names = image_datasets.classes
 num_class = len(class_names)
+num_sample = batch_size * step_size
+alpha = config.alpha
+exp_time = datetime.datetime.now().strftime('%y%m%d-%H')
+
+if config.weighted: mode = 'weighted'
+else: mode = 'random'
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -101,6 +116,7 @@ imshow(out, title=[class_names[x] for x in classes])
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     since = time.time()
+    f = open(os.path.join(config.log_path, exp_time + mode + '_log.txt'), 'w')
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
@@ -108,36 +124,37 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
-
+        wrong_list = [alpha for i in range(num_class)]
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
             if phase == 'train':
                 scheduler.step()
-                model.train()  # Set model to training mode
+                model.train() 
+                total_wrong = 0
+                wrong_list = [alpha for i in range(num_class)]
+                for ele in wrong_list: total_wrong += ele
+                
+                weights = [x / total_wrong for x in wrong_list]
+                
+                if config.weighted:
+                    sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, len(weights))
+                else: 
+                    sampler = torch.utils.data.sampler.RandomSampler(image_datasets)
+                
+                dataloaders = torch.utils.data.DataLoader(image_datasets, 
+                    batch_size=batch_size, sampler = sampler) 
+                # Set model to training mode
             else:
-                model.eval()   # Set model to evaluate mode
+                model.eval()
+                dataloaders = torch.utils.data.DataLoader(
+                    image_datasets, batch_size=batch_size, shuffle=True)   
+                # Set model to evaluate mode
 
             running_loss = 0.0
             running_corrects = 0
 
             # Iterate over data.
-            
-            total_wrong = 0
-            wrong_list = [1 for i in range(num_class)]
-            for ele in wrong_list: total_wrong += ele
-            
-            weights = [x / total_wrong for x in wrong_list]
-            
-            if config.weighted:
-                sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, len(weights))
-            else: 
-                sampler = torch.utils.data.sampler.RandomSampler(image_datasets)
-            
-            dataloaders = torch.utils.data.DataLoader(image_datasets, 
-                batch_size=batch_size, sampler = sampler)
-        
-
-            for step in range(1000):
+            for step in range(step_size):
 
                 inputs, labels = next(iter(dataloaders))
                 step += 1
@@ -169,21 +186,24 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 running_corrects += torch.sum(preds == labels.data)
                 if counter % 100 == 0:
                     print('{} Step \tLoss: {:.4f} Acc: {:.4f}'.format(
-                        counter, cur_loss, torch.sum(preds == labels.data)/4))
+                        counter, cur_loss, torch.sum(preds == labels.data)/batch_size))
 
                 # pdb.set_trace()
 
-            epoch_loss = running_loss / dataset_sizes
-            epoch_acc = running_corrects.double() / dataset_sizes
+            epoch_loss = running_loss / num_sample
+            epoch_acc = running_corrects.double() / num_sample
 
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(
-                phase, epoch_loss, epoch_acc))
+            epoch_log = '{} Loss: {:.4f} Acc: {:.4f}'.format(
+                phase, epoch_loss, epoch_acc)
+            print(epoch_log)
+            f.write(epoch_log)
 
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-
+        if epoch % config.save_freq == 0:
+            torch.save(model.state_dict(), os.path.join(config.checkpoint, exp_time + mode + '_model.pt'))
         print()
 
     time_elapsed = time.time() - since
@@ -230,7 +250,7 @@ def visualize_model(model, num_images=6):
 # Finetuning the convnet
 
 
-model_ft = models.resnet18(pretrained=True)
+model_ft = models.resnet50(pretrained=True)
 num_ftrs = model_ft.fc.in_features
 model_ft.fc = nn.Linear(num_ftrs, num_class)
 
