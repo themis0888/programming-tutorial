@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-CUDA_VISIBLE_DEVICES=0 python -i 003_transfer_learning_tutorial.py \
---weighted=True
+CUDA_VISIBLE_DEVICES=3 python -i 801_weighted_sampling.py \
+--weighted=True \
+--retrain True 
 
 
 Transfer Learning Tutorial
@@ -36,14 +37,17 @@ parser.add_argument('--data_name', type=str, dest='data_name', default='danbooru
 parser.add_argument('--save_path', type=str, dest='save_path', default='/home/siit/navi/data/meta_data/mnist_png/')
 parser.add_argument('--checkpoint', type=str, dest='checkpoint', default='./checkpoint')
 parser.add_argument('--log_path', type=str, dest='log_path', default='./log')
+parser.add_argument('--load_date', type=str, dest='load_date', default='')
 
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=34)
-parser.add_argument('--batch_size', type=int, dest='batch_size', default=4)
+parser.add_argument('--batch_size', type=int, dest='batch_size', default=8)
 parser.add_argument('--step_size', type=int, dest='step_size', default=500)
-parser.add_argument('--alpha', type=int, dest='alpha', default=30)
+parser.add_argument('--alpha', type=int, dest='alpha', default=0.8)
 parser.add_argument('--save_freq', type=int, dest='save_freq', default=5)
+
 parser.add_argument('--path_label', type=bool, dest='path_label', default=False)
 parser.add_argument('--weighted', type=bool, dest='weighted', default=False)
+parser.add_argument('--retrain', type=bool, dest='retrain', default=False)
 parser.add_argument('--iter', type=int, dest='iter', default=1)
 config, unparsed = parser.parse_known_args() 
 
@@ -65,8 +69,7 @@ step_size = config.step_size
 data_dir = '/home/siit/navi/data/input_data/CUB_200_2011/images/'
 image_datasets = datasets.ImageFolder(os.path.join(data_dir),
                                           data_transforms)
-dataloaders = torch.utils.data.DataLoader(image_datasets, batch_size=batch_size,
-                                             shuffle=True)
+dataloaders = torch.utils.data.DataLoader(image_datasets, batch_size=batch_size)
 
 dataset_sizes = len(image_datasets)
 class_names = image_datasets.classes
@@ -74,6 +77,7 @@ num_class = len(class_names)
 num_sample = batch_size * step_size
 alpha = config.alpha
 exp_time = datetime.datetime.now().strftime('%y%m%d-%H')
+load_date = config.load_date
 
 if config.weighted: mode = 'weighted'
 else: mode = 'random'
@@ -111,7 +115,20 @@ imshow(out, title=[class_names[x] for x in classes])
 ######################################################################
 # Training the model
 # ------------------
-
+def make_weights_for_balanced_classes(images, nclasses):                        
+    count = [0] * nclasses                                                      
+    for item in images:                                                         
+        count[item[1]] += 1                                                     
+    weight_per_class = [0.] * nclasses                                      
+    N = float(sum(count))                                                   
+    """
+    for i in range(nclasses):                                                   
+        weight_per_class[i] = N/float(count[i])                                 
+    weight = [0] * len(images)                                              
+    for idx, val in enumerate(images):                                          
+        weight[idx] = weight_per_class[val[1]]                                  
+    """
+    return count
 
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
@@ -121,33 +138,56 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
     counter = 0
+    
+    wrong_list = [1 for i in range(num_class)]
+
+    data_statistics = np.load('cub_statistics.npy') #make_weights_for_balanced_classes(image_datasets, num_class)
+
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
-        wrong_list = [alpha for i in range(num_class)]
+        # label_list = [0 for i in range(num_class)]
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
+            label_list = [0 for i in range(num_class)]
             if phase == 'train':
                 scheduler.step()
                 model.train() 
+                
                 total_wrong = 0
-                wrong_list = [alpha for i in range(num_class)]
-                for ele in wrong_list: total_wrong += ele
-                
-                weights = [x / total_wrong for x in wrong_list]
-                
+                # for ele in wrong_list: total_wrong += ele
+                weights = []
                 if config.weighted:
-                    sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, len(weights))
+                    weights_list = [(1-alpha) / num_class + alpha * x / sum(wrong_list) for x in wrong_list]
+                    for index in range(num_class):
+                        num_data = data_statistics[index]
+                        weights += [weights_list[index] / num_data] * num_data
                 else: 
-                    sampler = torch.utils.data.sampler.RandomSampler(image_datasets)
-                
+                    weights_list = [1 / num_class for x in range(len(wrong_list))]
+                    weights = [0] * len(image_datasets)
+
+                print(weights[:3])
+                sampler = torch.utils.data.sampler.WeightedRandomSampler(  # torch.tensor(weights).type('torch.DoubleTensor')
+                    weights, batch_size)
+                # sampler = torch.utils.data.sampler.RandomSampler(image_datasets)
                 dataloaders = torch.utils.data.DataLoader(image_datasets, 
                     batch_size=batch_size, sampler = sampler) 
                 # Set model to training mode
+
             else:
                 model.eval()
+                wrong_list = [1 for i in range(num_class)]
+                
                 dataloaders = torch.utils.data.DataLoader(
-                    image_datasets, batch_size=batch_size, shuffle=True)   
+                    image_datasets, batch_size=batch_size, shuffle=True)  
+                """
+                weights = [1 / num_class for x in range(len(wrong_list))]
+
+                print(weights[:4])
+                sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, num_class)
+                dataloaders = torch.utils.data.DataLoader(image_datasets, 
+                    batch_size=batch_size, sampler = sampler) 
+                """
                 # Set model to evaluate mode
 
             running_loss = 0.0
@@ -157,6 +197,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
             for step in range(step_size):
 
                 inputs, labels = next(iter(dataloaders))
+                # print(labels)
                 step += 1
                 counter += 1
                 inputs = inputs.to(device)
@@ -164,7 +205,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
-
+                for i in range(batch_size):
+                    label_list[labels[i]] += 1
                 # forward
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
@@ -172,13 +214,16 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                     _, preds = torch.max(outputs, 1)
                     loss = criterion(outputs, labels)
 
-                    for i in range(batch_size):
-                        if labels[i] != preds[i]:
-                            wrong_list[labels[i]] += 1
                     # backward + optimize only if in training phase
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
+                
+                if phase == 'val':
+                    for i in range(batch_size):
+                        if labels[i] != preds[i]:
+                            wrong_list[labels[i]] += 1
+                    
 
                 # statistics
                 cur_loss = loss.item() * inputs.size(0)
@@ -189,21 +234,22 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                         counter, cur_loss, torch.sum(preds == labels.data)/batch_size))
 
                 # pdb.set_trace()
-
+            print(label_list)
             epoch_loss = running_loss / num_sample
             epoch_acc = running_corrects.double() / num_sample
 
-            epoch_log = '{} Loss: {:.4f} Acc: {:.4f}'.format(
+            epoch_log = '{} Loss: {:.4f} Acc: {:.4f} \n'.format(
                 phase, epoch_loss, epoch_acc)
             print(epoch_log)
             f.write(epoch_log)
-
+            # pdb.set_trace()
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
         if epoch % config.save_freq == 0:
             torch.save(model.state_dict(), os.path.join(config.checkpoint, exp_time + mode + '_model.pt'))
+            
         print()
 
     time_elapsed = time.time() - since
@@ -220,7 +266,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 # Visualizing the model predictions
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-def visualize_model(model, num_images=6):
+def visualize_model(model, num_images=batch_size):
     was_training = model.training
     model.eval()
     images_so_far = 0
@@ -252,6 +298,7 @@ def visualize_model(model, num_images=6):
 
 model_ft = models.resnet50(pretrained=True)
 num_ftrs = model_ft.fc.in_features
+    
 model_ft.fc = nn.Linear(num_ftrs, num_class)
 
 model_ft = model_ft.to(device)
@@ -266,6 +313,10 @@ exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
 
 ######################################################################
 # Train and evaluate
+if config.retrain:
+    model_ft.load_state_dict(torch.load(
+        os.path.join(config.checkpoint, load_date + mode + '_model.pt')
+    ))
 
 model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
                        num_epochs=25)
