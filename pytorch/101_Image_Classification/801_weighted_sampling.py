@@ -42,7 +42,7 @@ parser.add_argument('--load_date', type=str, dest='load_date', default='')
 parser.add_argument('--n_classes', type=int, dest='n_classes', default=34)
 parser.add_argument('--batch_size', type=int, dest='batch_size', default=8)
 parser.add_argument('--step_size', type=int, dest='step_size', default=500)
-parser.add_argument('--alpha', type=int, dest='alpha', default=0.8)
+parser.add_argument('--alpha', type=int, dest='alpha', default=0.5)
 parser.add_argument('--save_freq', type=int, dest='save_freq', default=5)
 
 parser.add_argument('--path_label', type=bool, dest='path_label', default=False)
@@ -131,7 +131,7 @@ def make_weights_for_balanced_classes(images, nclasses):
     return count
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, num_epochs=2501):
     since = time.time()
     f = open(os.path.join(config.log_path, exp_time + mode + '_log.txt'), 'w')
 
@@ -164,7 +164,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                         weights += [weights_list[index] / num_data] * num_data
                 else: 
                     weights_list = [1 / num_class for x in range(len(wrong_list))]
-                    weights = [0] * len(image_datasets)
+                    weights = [1] * len(image_datasets)
 
                 print(weights[:3])
                 sampler = torch.utils.data.sampler.WeightedRandomSampler(  # torch.tensor(weights).type('torch.DoubleTensor')
@@ -173,6 +173,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 dataloaders = torch.utils.data.DataLoader(image_datasets, 
                     batch_size=batch_size, sampler = sampler) 
                 # Set model to training mode
+                
 
             else:
                 model.eval()
@@ -180,14 +181,6 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 
                 dataloaders = torch.utils.data.DataLoader(
                     image_datasets, batch_size=batch_size, shuffle=True)  
-                """
-                weights = [1 / num_class for x in range(len(wrong_list))]
-
-                print(weights[:4])
-                sampler = torch.utils.data.sampler.WeightedRandomSampler(weights, num_class)
-                dataloaders = torch.utils.data.DataLoader(image_datasets, 
-                    batch_size=batch_size, sampler = sampler) 
-                """
                 # Set model to evaluate mode
 
             running_loss = 0.0
@@ -205,8 +198,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
-                for i in range(batch_size):
-                    label_list[labels[i]] += 1
+
                 # forward
                 # track history if only in train
                 with torch.set_grad_enabled(phase == 'train'):
@@ -218,6 +210,9 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                     if phase == 'train':
                         loss.backward()
                         optimizer.step()
+                        for i in range(batch_size):
+                            label_list[labels[i]] += 1
+
                 
                 if phase == 'val':
                     for i in range(batch_size):
@@ -233,8 +228,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                     print('{} Step \tLoss: {:.4f} Acc: {:.4f}'.format(
                         counter, cur_loss, torch.sum(preds == labels.data)/batch_size))
 
-                # pdb.set_trace()
-            print(label_list)
+            pdb.set_trace()
             epoch_loss = running_loss / num_sample
             epoch_acc = running_corrects.double() / num_sample
 
@@ -317,9 +311,9 @@ if config.retrain:
     model_ft.load_state_dict(torch.load(
         os.path.join(config.checkpoint, load_date + mode + '_model.pt')
     ))
+    print(load_date + mode + '_model.pt loaded')
 
-model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler,
-                       num_epochs=25)
+model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler)
 
 
 visualize_model(model_ft)
