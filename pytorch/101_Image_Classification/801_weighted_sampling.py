@@ -22,6 +22,7 @@ from torch.optim import lr_scheduler
 import numpy as np
 import torchvision
 from torchvision import datasets, models, transforms
+from tensorboardX import SummaryWriter
 import matplotlib.pyplot as plt
 import time
 import os, datetime
@@ -33,7 +34,6 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/input_data/mnist_png/')
-parser.add_argument('--data_name', type=str, dest='data_name', default='danbooru')
 parser.add_argument('--save_path', type=str, dest='save_path', default='/home/siit/navi/data/meta_data/mnist_png/')
 parser.add_argument('--checkpoint', type=str, dest='checkpoint', default='./checkpoint')
 parser.add_argument('--log_path', type=str, dest='log_path', default='./log')
@@ -44,6 +44,7 @@ parser.add_argument('--batch_size', type=int, dest='batch_size', default=8)
 parser.add_argument('--step_size', type=int, dest='step_size', default=500)
 parser.add_argument('--alpha', type=int, dest='alpha', default=0.5)
 parser.add_argument('--save_freq', type=int, dest='save_freq', default=5)
+parser.add_argument('--record_freq', type=int, dest='record_freq', default=100)
 
 parser.add_argument('--path_label', type=bool, dest='path_label', default=False)
 parser.add_argument('--weighted', type=bool, dest='weighted', default=False)
@@ -56,6 +57,8 @@ plt.ion()   # interactive mode
 
 if not os.path.exists(config.checkpoint): os.makedirs(config.checkpoint)
 if not os.path.exists(config.log_path): os.makedirs(config.log_path)
+
+writer = SummaryWriter()
 
 data_transforms = transforms.Compose([
         transforms.RandomResizedCrop(224),
@@ -78,6 +81,7 @@ num_sample = batch_size * step_size
 alpha = config.alpha
 exp_time = datetime.datetime.now().strftime('%y%m%d-%H')
 load_date = config.load_date
+record_freq = config.record_freq
 
 if config.weighted: mode = 'weighted'
 else: mode = 'random'
@@ -138,20 +142,24 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=2501):
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
     counter = 0
+    step = 0
+    train_step = 0
     
     wrong_list = [1 for i in range(num_class)]
 
     data_statistics = np.load('cub_statistics.npy') #make_weights_for_balanced_classes(image_datasets, num_class)
-
+    
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
         # label_list = [0 for i in range(num_class)]
         # Each epoch has a training and validation phase
         for phase in ['train', 'val']:
+            
             label_list = [0 for i in range(num_class)]
             if phase == 'train':
-                scheduler.step()
+                if step % 200000 == 0:
+                    scheduler.step()
                 model.train() 
                 
                 total_wrong = 0
@@ -185,14 +193,14 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=2501):
 
             running_loss = 0.0
             running_corrects = 0
-
+            record_loss = 0.0
+            record_acc = 0
             # Iterate over data.
-            for step in range(step_size):
+            for counter in range(step_size):
 
                 inputs, labels = next(iter(dataloaders))
                 # print(labels)
                 step += 1
-                counter += 1
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
@@ -208,6 +216,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=2501):
 
                     # backward + optimize only if in training phase
                     if phase == 'train':
+                        train_step += 1
                         loss.backward()
                         optimizer.step()
                         for i in range(batch_size):
@@ -224,11 +233,25 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=2501):
                 cur_loss = loss.item() * inputs.size(0)
                 running_loss += cur_loss
                 running_corrects += torch.sum(preds == labels.data)
-                if counter % 100 == 0:
+                record_loss += cur_loss
+                record_acc += torch.sum(preds == labels.data)
+                
+                if step % record_freq == 0:
                     print('{} Step \tLoss: {:.4f} Acc: {:.4f}'.format(
-                        counter, cur_loss, torch.sum(preds == labels.data)/batch_size))
+                        step, cur_loss, torch.sum(preds == labels.data)/batch_size))
+                    
 
-            pdb.set_trace()
+                    writer.add_scalars('data/loss', {mode: record_loss / record_freq / batch_size}, train_step)
+                    writer.add_scalars('data/acc', {mode: record_acc / record_freq / batch_size}, train_step)
+                    record_loss = 0.0
+                    record_acc = 0
+                    
+                    for i in range(batch_size):
+                        label_pred = mode + '\: ' + class_names[labels[i]] + ' \@ ' + class_names[preds[i]]
+                        writer.add_image(mode + '_Image{}'.format(i), inputs[i], train_step)
+
+
+            # pdb.set_trace()
             epoch_loss = running_loss / num_sample
             epoch_acc = running_corrects.double() / num_sample
 
@@ -303,7 +326,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
 
 # Decay LR by a factor of 0.1 every 7 epochs
-exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=1, gamma=0.3)
 
 ######################################################################
 # Train and evaluate
@@ -314,7 +337,8 @@ if config.retrain:
     print(load_date + mode + '_model.pt loaded')
 
 model_ft = train_model(model_ft, criterion, optimizer_ft, exp_lr_scheduler)
-
+writer.export_scalars_to_json("./all_scalars.json")
+writer.close()
 
 visualize_model(model_ft)
 
