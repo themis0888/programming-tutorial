@@ -5,13 +5,14 @@ import numpy as np
 import torchvision.models as models
 from torchvision import datasets
 from tensorboardX import SummaryWriter
+import pdb
 
 resnet18 = models.resnet18(False)
 writer = SummaryWriter()
 sample_rate = 44100
 freqs = [262, 294, 330, 349, 392, 440, 440, 440, 440, 440, 440]
 
-for n_iter in range(100):
+for n_iter in range(50000):
 
     dummy_s1 = torch.rand(1)
     dummy_s2 = torch.rand(1)
@@ -26,7 +27,11 @@ for n_iter in range(100):
     dummy_img = torch.rand(32, 3, 64, 64)  # output from network
     if n_iter % 10 == 0:
         x = vutils.make_grid(dummy_img, normalize=True, scale_each=True)
+        print('Hello world! :D')
+        # pdb.set_trace()
+
         writer.add_image('Image', x, n_iter)
+        writer.add_image('Image242', x, n_iter)
 
         dummy_audio = torch.zeros(sample_rate * 2)
         for i in range(x.size(0)):
