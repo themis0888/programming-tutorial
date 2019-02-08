@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-CUDA_VISIBLE_DEVICES=3 python -i 801_weighted_sampling.py \
+CUDA_VISIBLE_DEVICES=2 python -i 801_weighted_sampling.py \
 --weighted=True \
 --retrain True 
 
@@ -33,7 +33,7 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/input_data/mnist_png/')
+parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/input_data/CLS-LOC-200/')
 parser.add_argument('--save_path', type=str, dest='save_path', default='/home/siit/navi/data/meta_data/mnist_png/')
 parser.add_argument('--checkpoint', type=str, dest='checkpoint', default='./checkpoint')
 parser.add_argument('--log_path', type=str, dest='log_path', default='./log')
@@ -69,7 +69,7 @@ data_transforms = transforms.Compose([
 
 batch_size = config.batch_size
 step_size = config.step_size
-data_dir = '/home/siit/navi/data/input_data/CUB_200_2011/images/'
+data_dir = config.data_path
 image_datasets = datasets.ImageFolder(os.path.join(data_dir),
                                           data_transforms)
 dataloaders = torch.utils.data.DataLoader(image_datasets, batch_size=batch_size)
@@ -147,7 +147,10 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=2501):
     
     wrong_list = [1 for i in range(num_class)]
 
-    data_statistics = np.load('cub_statistics.npy') #make_weights_for_balanced_classes(image_datasets, num_class)
+    if not os.path.exists('imagenet_statistics.npy'):
+        data_statistics = make_weights_for_balanced_classes(image_datasets, num_class)
+        np.save('imagenet_statistics.npy', data_statistics)
+    data_statistics = np.load('imagenet_statistics.npy')
     
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
@@ -343,7 +346,7 @@ writer.close()
 visualize_model(model_ft)
 
 
-model_conv = torchvision.models.resnet50(pretrained=True)
+model_conv = torchvision.models.resnet50(pretrained=False)
 for param in model_conv.parameters():
     param.requires_grad = False
 
