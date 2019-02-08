@@ -8,6 +8,7 @@ python -i 002_label_processor.py \
 import os
 import argparse
 import numpy as np
+import glob
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_path', type=str, dest='data_path', default='/home/siit/navi/data/input_data/mnist_png/')
@@ -48,13 +49,20 @@ label_list.sort()
 path_label_dict = {}
 
 f = open(os.path.join(config.save_path, 'train.txt'), 'w')
-for line in path_list:
+for line in glob.glob(config.data_path + '/0*/*'):
     label_index = label_list.index(line.split('/')[-2]) 
 
     f.write('{} {}\n'.format(line, label_index))
     
 f.close()
 
+f = open(os.path.join(config.save_path, 'test.txt'), 'w')
+for line in glob.glob(config.data_path + '/1*/*'):
+    label_index = label_list.index(line.split('/')[-2]) 
+
+    f.write('{} {}\n'.format(line, label_index))
+    
+f.close()
 """
 counter = 0
 for line in path_list:
