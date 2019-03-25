@@ -179,7 +179,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=2501):
 
                 print(weights[:3])
                 sampler = torch.utils.data.sampler.WeightedRandomSampler(  # torch.tensor(weights).type('torch.DoubleTensor')
-                    weights, batch_size)
+                    weights, batch_size * step_size) # This line has been changed
                 # sampler = torch.utils.data.sampler.RandomSampler(image_datasets)
                 dataloaders = torch.utils.data.DataLoader(image_datasets, 
                     batch_size=batch_size, sampler = sampler) 
@@ -248,7 +248,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=2501):
                     writer.add_scalars('data/acc', {mode: record_acc / record_freq / batch_size}, train_step)
                     record_loss = 0.0
                     record_acc = 0
-                    
+                     
                     for i in range(batch_size):
                         label_pred = mode + '\: ' + class_names[labels[i]] + ' \@ ' + class_names[preds[i]]
                         writer.add_image(mode + '_Image{}'.format(i), inputs[i], train_step)
@@ -316,7 +316,7 @@ def visualize_model(model, num_images=batch_size):
 # Finetuning the convnet
 
 
-model_ft = models.resnet50(pretrained=True)
+model_ft = models.resnet50(pretrained=False)
 num_ftrs = model_ft.fc.in_features
     
 model_ft.fc = nn.Linear(num_ftrs, num_class)
