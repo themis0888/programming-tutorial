@@ -10,6 +10,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 import seaborn as sns
 from scipy import stats
 import pdb
