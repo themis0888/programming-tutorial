@@ -10,7 +10,7 @@ from scipy import stats
 import pdb
 
 
-
+# Bar plot 
 classes = np.array(list(range(1,11)))
 
 benchmark = np.random.randn(10)
@@ -30,5 +30,7 @@ plt.title('Err / Num_data per Class')
 
 plt.savefig('sample.png')
 plt.cla()
+
+
 
 
